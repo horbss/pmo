@@ -1,0 +1,187 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Search Results - Spotify Social{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h2 class="mb-4">Search Results for "{{ query }}"</h2>
+            
+            {% if results.tracks %}
+                <h3 class="mt-4">Tracks</h3>
+                <div class="list-group">
+                    {% for track in results.tracks %}
+                        <div class="list-group-item">
+                            <div class="d-flex align-items-center">
+                                {% if track.album.images %}
+                                    <img src="{{ track.album.images.0.url }}" 
+                                         alt="Album Cover" 
+                                         class="me-3"
+                                         style="width: 64px; height: 64px;">
+                                {% endif %}
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-1">{{ track.name }}</h5>
+                                    <p class="mb-1">
+                                        {% for artist in track.artists %}
+                                            {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </p>
+                                    <p class="mb-0 small text-muted">{{ track.album.name }}</p>
+                                    
+                                    <div class="mt-2">
+                                        {% if track.preview_url %}
+                                            <audio controls class="me-2" style="height: 25px;">
+                                                <source src="{{ track.preview_url }}" type="audio/mpeg">
+                                                Your browser does not support the audio element.
+                                            </audio>
+                                        {% endif %}
+                                        
+                                        <a href="{{ track.spotify_url }}" 
+                                           target="_blank" 
+                                           class="btn btn-sm btn-outline-primary me-2">
+                                            <i class="bi bi-spotify"></i> Open in Spotify
+                                        </a>
+                                        
+                                        {% if track.avg_rating.average %}
+                                            <div class="d-inline-block me-2">
+                                                <span class="text-warning">
+                                                    {% for i in "12345"|make_list %}
+                                                        {% if forloop.counter <= track.avg_rating.average|floatformat:0 %}
+                                                            <i class="bi bi-star-fill"></i>
+                                                        {% else %}
+                                                            <i class="bi bi-star"></i>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </span>
+                                                <small class="text-muted">
+                                                    ({{ track.avg_rating.average }} from {{ track.avg_rating.count }} rating{{ track.avg_rating.count|pluralize }})
+                                                </small>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if user.is_authenticated %}
+                                            <div class="rating mt-2">
+                                                <span class="me-2">Your Rating:</span>
+                                                <div class="btn-group" role="group">
+                                                    {% for i in "12345"|make_list %}
+                                                        <button type="button" 
+                                                                class="btn btn-sm {% if track.user_rating == forloop.counter %}btn-warning{% else %}btn-outline-warning{% endif %}"
+                                                                data-track-id="{{ track.id }}"
+                                                                data-track-name="{{ track.name }}"
+                                                                data-artist-name="{% for artist in track.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                                                                data-rating="{{ forloop.counter }}">
+                                                            {{ forloop.counter }}
+                                                        </button>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            {% if results.albums %}
+                <h3 class="mt-4">Albums</h3>
+                <div class="row">
+                    {% for album in results.albums %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                {% if album.images %}
+                                    <img src="{{ album.images.0.url }}" 
+                                         class="card-img-top" 
+                                         alt="{{ album.name }}"
+                                         style="height: 200px; object-fit: cover;">
+                                {% endif %}
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ album.name }}</h5>
+                                    <p class="card-text">
+                                        {% for artist in album.artists %}
+                                            {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </p>
+                                    <p class="card-text small text-muted">
+                                        {{ album.release_date|slice:":4" }} • {{ album.total_tracks }} tracks
+                                    </p>
+                                    <a href="{{ album.spotify_url }}" 
+                                       target="_blank" 
+                                       class="btn btn-outline-primary">
+                                        <i class="bi bi-spotify"></i> Open in Spotify
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            {% if not results.tracks and not results.albums and query %}
+                <div class="alert alert-info">
+                    No results found for "{{ query }}"
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if user.is_authenticated %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ratingButtons = document.querySelectorAll('.rating button');
+    
+    ratingButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const trackId = this.dataset.trackId;
+            const trackName = this.dataset.trackName;
+            const artistName = this.dataset.artistName;
+            const rating = this.dataset.rating;
+            
+            // Send rating to server
+            fetch('{% url "rate_track" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: new URLSearchParams({
+                    'track_id': trackId,
+                    'track_name': trackName,
+                    'artist_name': artistName,
+                    'rating': rating
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update button styles
+                    const buttons = this.parentElement.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        if (parseInt(btn.dataset.rating) <= rating) {
+                            btn.classList.remove('btn-outline-warning');
+                            btn.classList.add('btn-warning');
+                        } else {
+                            btn.classList.remove('btn-warning');
+                            btn.classList.add('btn-outline-warning');
+                        }
+                    });
+                    
+                    // Reload the page to update average ratings
+                    window.location.reload();
+                } else {
+                    alert('Error saving rating');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error saving rating');
+            });
+        });
+    });
+});
+</script>
+{% endif %}
+{% endblock %} 
