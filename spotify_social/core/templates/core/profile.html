@@ -1,0 +1,257 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ user.username }}'s Profile - Spotify Social{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="card-title">{{ user.username }}</h2>
+                    <p class="card-text">{{ user.email }}</p>
+                    
+                    {% if user.spotify_access_token %}
+                        {% if spotify_data %}
+                            <div class="d-flex align-items-center mb-3">
+                                {% if spotify_data.images %}
+                                    <img src="{{ spotify_data.images.0.url }}" 
+                                         alt="Spotify Profile" 
+                                         class="rounded-circle me-3"
+                                         style="width: 64px; height: 64px;">
+                                {% endif %}
+                                <div>
+                                    <h5 class="mb-1">{{ spotify_data.display_name }}</h5>
+                                    <p class="mb-1">{{ spotify_data.followers.total }} followers</p>
+                                    <p class="mb-0 small text-muted">Spotify ID: {{ spotify_data.id }}</p>
+                                </div>
+                            </div>
+                            <a href="{% url 'spotify_disconnect' %}" class="btn btn-danger">Disconnect Spotify</a>
+                        {% endif %}
+                    {% else %}
+                        <div class="alert alert-info">
+                            <p class="mb-0">Connect your Spotify account to share your music!</p>
+                            <a href="{% url 'spotify_login' %}" class="btn btn-primary mt-2">
+                                Connect Spotify
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if user.spotify_access_token %}
+                {% if currently_playing %}
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h3 class="card-title">Currently Playing</h3>
+                            <div class="d-flex align-items-center">
+                                {% if currently_playing.album.images %}
+                                    <img src="{{ currently_playing.album.images.0.url }}" 
+                                         alt="Album Cover" 
+                                         class="me-3"
+                                         style="width: 64px; height: 64px;">
+                                {% endif %}
+                                <div>
+                                    <h5 class="mb-1">{{ currently_playing.name }}</h5>
+                                    <p class="mb-0">
+                                        {% for artist in currently_playing.artists %}
+                                            {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h3 class="card-title">Top Artists</h3>
+                        <div class="row">
+                            {% for artist in top_artists.items %}
+                                <div class="col-md-4 mb-3">
+                                    <div class="card">
+                                        {% if artist.images %}
+                                            <img src="{{ artist.images.0.url }}" 
+                                                 class="card-img-top" 
+                                                 alt="{{ artist.name }}"
+                                                 style="height: 200px; object-fit: cover;">
+                                        {% endif %}
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ artist.name }}</h5>
+                                            <p class="card-text small text-muted">
+                                                {{ artist.followers.total }} followers
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h3 class="card-title">Top Tracks</h3>
+                        <div class="row">
+                            {% for track in top_tracks.items %}
+                                <div class="col-md-4 mb-3">
+                                    <div class="card">
+                                        {% if track.album.images %}
+                                            <img src="{{ track.album.images.0.url }}" 
+                                                 class="card-img-top" 
+                                                 alt="{{ track.name }}"
+                                                 style="height: 200px; object-fit: cover;">
+                                        {% endif %}
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ track.name }}</h5>
+                                            <p class="card-text">
+                                                {% for artist in track.artists %}
+                                                    {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Posts</h3>
+                    
+                    {% if user.spotify_access_token %}
+                        <div class="mb-4">
+                            <form method="post" action="{% url 'social:create_post' %}" class="mb-3">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="content" class="form-label">Share your thoughts</label>
+                                    <textarea class="form-control" id="content" name="content" rows="3"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="spotify_link" class="form-label">Spotify Link</label>
+                                    <input type="text" class="form-control" id="spotify_link" name="spotify_link" 
+                                           placeholder="https://open.spotify.com/track/..." required>
+                                    <div class="form-text">
+                                        Paste a Spotify track or album link. Example: https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Post Type</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="post_type" id="track" value="track" checked>
+                                        <label class="form-check-label" for="track">Track</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="post_type" id="album" value="album">
+                                        <label class="form-check-label" for="album">Album</label>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Create Post</button>
+                            </form>
+                        </div>
+                    {% endif %}
+                    
+                    {% for post in posts %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    {% if post.user.spotify_data.images %}
+                                        <img src="{{ post.user.spotify_data.images.0.url }}" 
+                                             alt="Profile" 
+                                             class="rounded-circle me-3"
+                                             style="width: 40px; height: 40px;">
+                                    {% endif %}
+                                    <div>
+                                        <h5 class="mb-0">{{ post.user.username }}</h5>
+                                        <small class="text-muted">{{ post.created_at|timesince }} ago</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex align-items-center mb-3">
+                                    {% if post.spotify_image_url %}
+                                        <img src="{{ post.spotify_image_url }}" 
+                                             alt="{{ post.spotify_name }}" 
+                                             class="me-3"
+                                             style="width: 64px; height: 64px;">
+                                    {% endif %}
+                                    <div>
+                                        <h5 class="mb-1">{{ post.spotify_name }}</h5>
+                                        <p class="mb-0">{{ post.spotify_artist }}</p>
+                                    </div>
+                                </div>
+                                
+                                <p class="card-text">{{ post.content }}</p>
+                                
+                                <div class="mt-3">
+                                    {% if post.spotify_preview_url %}
+                                        <audio controls class="me-2" style="height: 25px;">
+                                            <source src="{{ post.spotify_preview_url }}" type="audio/mpeg">
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    {% endif %}
+                                    
+                                    <a href="{{ post.spotify_url }}" 
+                                       target="_blank" 
+                                       class="btn btn-sm btn-outline-primary me-2">
+                                        <i class="bi bi-spotify"></i> Open in Spotify
+                                    </a>
+                                    
+                                    {% if post.post_type == 'track' %}
+                                        <button class="btn btn-sm btn-outline-secondary add-to-queue"
+                                                data-spotify-uri="{{ post.get_spotify_uri }}">
+                                            <i class="bi bi-plus-circle"></i> Add to Queue
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted">No posts yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if user.spotify_access_token %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const queueButtons = document.querySelectorAll('.add-to-queue');
+    
+    queueButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const spotifyUri = this.dataset.spotifyUri;
+            
+            fetch('{% url "social:add_to_queue" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: new URLSearchParams({
+                    'spotify_uri': spotifyUri
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Added to queue successfully!');
+                } else {
+                    alert('Error adding to queue: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error adding to queue');
+            });
+        });
+    });
+});
+</script>
+{% endif %}
+{% endblock %} 
