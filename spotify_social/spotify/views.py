@@ -3,6 +3,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from django.conf import settings
 from django.shortcuts import redirect
+from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from core.models import User
@@ -20,23 +21,25 @@ def spotify_login(request):
     logger.debug(f"Client ID: {settings.SPOTIFY_CLIENT_ID}")
     logger.debug(f"Client Secret: {settings.SPOTIFY_CLIENT_SECRET}")
     logger.debug(f"Redirect URI: {settings.SPOTIFY_REDIRECT_URI}")
+    logger.debug(f"Scopes: {settings.SPOTIFY_SCOPES}")
     
-    sp_oauth = SpotifyOAuth(
-        client_id=settings.SPOTIFY_CLIENT_ID,
-        client_secret=settings.SPOTIFY_CLIENT_SECRET,
-        redirect_uri=settings.SPOTIFY_REDIRECT_URI,
-        scope=settings.SPOTIFY_SCOPES
-    )
-    auth_url = sp_oauth.get_authorize_url()
-    return redirect(auth_url)
+    try:
+        sp_oauth = SpotifyOAuth(
+            client_id=settings.SPOTIFY_CLIENT_ID,
+            client_secret=settings.SPOTIFY_CLIENT_SECRET,
+            redirect_uri=settings.SPOTIFY_REDIRECT_URI,
+            scope=settings.SPOTIFY_SCOPES
+        )
+        auth_url = sp_oauth.get_authorize_url()
+        logger.debug(f"Generated auth URL: {auth_url}")
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Error in spotify_login: {str(e)}")
+        messages.error(request, 'Error connecting to Spotify. Please try again.')
+        return redirect('home')
 
-@login_required
 def spotify_callback(request):
     """Handle Spotify OAuth callback"""
-    if not request.user.is_authenticated:
-        messages.error(request, 'Please log in first.')
-        return redirect('login')
-    
     sp_oauth = SpotifyOAuth(
         client_id=settings.SPOTIFY_CLIENT_ID,
         client_secret=settings.SPOTIFY_CLIENT_SECRET,
@@ -47,17 +50,49 @@ def spotify_callback(request):
     try:
         token_info = sp_oauth.get_access_token(request.GET.get('code'))
         if token_info:
-            request.user.spotify_access_token = token_info['access_token']
-            request.user.spotify_refresh_token = token_info['refresh_token']
-            request.user.save()
-            messages.success(request, 'Successfully connected to Spotify!')
-        else:
-            messages.error(request, 'Failed to get access token from Spotify.')
+            # Get Spotify user data
+            sp = spotipy.Spotify(auth=token_info['access_token'])
+            spotify_user = sp.current_user()
+            
+            # Debug log the Spotify user data
+            logger.debug(f"Spotify user data: {spotify_user}")
+            
+            # Check if user already exists with this Spotify email
+            try:
+                user = User.objects.get(email=spotify_user['email'])
+                # Update their Spotify token and ID
+                user.spotify_access_token = token_info['access_token']
+                user.spotify_refresh_token = token_info.get('refresh_token')
+                user.spotify_id = spotify_user['id']  # Save the Spotify ID
+                user.save()
+                login(request, user)
+                messages.success(request, 'Successfully logged in with Spotify!')
+            except User.DoesNotExist:
+                # Create new user with Spotify display name as username
+                username = spotify_user['display_name'].lower().replace(' ', '_')
+                # Ensure username is unique
+                base_username = username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}_{counter}"
+                    counter += 1
+                
+                user = User.objects.create_user(
+                    username=username,
+                    email=spotify_user['email'],
+                    spotify_access_token=token_info['access_token'],
+                    spotify_refresh_token=token_info.get('refresh_token'),
+                    spotify_id=spotify_user['id']  # Save the Spotify ID
+                )
+                login(request, user)
+                messages.success(request, 'Account created successfully! You can update your username in your profile.')
+            
+            return redirect('profile')
+    
     except Exception as e:
         logger.error(f"Error in Spotify callback: {str(e)}")
         messages.error(request, 'Error connecting to Spotify. Please try again.')
-    
-    return redirect('profile')
+        return redirect('home')
 
 @login_required
 def spotify_disconnect(request):

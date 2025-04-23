@@ -4,7 +4,7 @@ from django.contrib.auth import login
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from .models import User
-from .forms import CustomUserCreationForm
+from .forms import CustomUserCreationForm, UsernameEditForm
 from social.models import Post
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -64,3 +64,18 @@ def register(request):
     else:
         form = CustomUserCreationForm()
     return render(request, 'core/register.html', {'form': form})
+
+@login_required
+def edit_username(request):
+    if request.method == 'POST':
+        form = UsernameEditForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your username has been updated successfully!')
+            return redirect('profile')
+    else:
+        form = UsernameEditForm(instance=request.user)
+    
+    return render(request, 'core/edit_username.html', {
+        'form': form
+    })
