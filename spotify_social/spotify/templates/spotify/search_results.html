@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const rating = this.dataset.rating;
             
             // Send rating to server
-            fetch('{% url "rate_track" %}', {
+            fetch('{% url "spotify:rate_track" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',

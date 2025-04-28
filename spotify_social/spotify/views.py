@@ -104,67 +104,115 @@ def spotify_disconnect(request):
     messages.success(request, 'Successfully disconnected from Spotify.')
     return redirect('profile')
 
+def refresh_spotify_token(user):
+    """Refresh Spotify access token using refresh token"""
+    try:
+        sp_oauth = SpotifyOAuth(
+            client_id=settings.SPOTIFY_CLIENT_ID,
+            client_secret=settings.SPOTIFY_CLIENT_SECRET,
+            redirect_uri=settings.SPOTIFY_REDIRECT_URI,
+            scope=settings.SPOTIFY_SCOPES
+        )
+        
+        # Create a token info dictionary with the refresh token
+        token_info = {
+            'access_token': user.spotify_access_token,
+            'refresh_token': user.spotify_refresh_token,
+            'expires_at': 0  # Force refresh
+        }
+        
+        # Get new token info
+        new_token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        
+        if new_token_info:
+            # Update user's tokens
+            user.spotify_access_token = new_token_info['access_token']
+            if 'refresh_token' in new_token_info:
+                user.spotify_refresh_token = new_token_info['refresh_token']
+            user.save()
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Error refreshing Spotify token: {str(e)}")
+        return False
+
 @login_required
 def spotify_search(request):
     """Search for tracks and albums on Spotify"""
     if not request.user.spotify_access_token:
-        messages.error(request, 'Please connect your Spotify account first.')
-        return redirect('profile')
+        return JsonResponse({
+            'error': 'Please connect your Spotify account first.'
+        }, status=401)
     
     query = request.GET.get('q', '')
     results = {'tracks': [], 'albums': []}
     
-    if query:
+    if not query:
+        return JsonResponse({
+            'error': 'Search query is required.'
+        }, status=400)
+    
+    try:
+        # Try to create Spotify client with current token
         try:
             sp = spotipy.Spotify(auth=request.user.spotify_access_token)
-            
-            # Search for tracks
-            track_results = sp.search(q=query, type='track', limit=10)
-            tracks = track_results['tracks']['items']
-            
-            # Get user ratings for tracks
-            track_ids = [track['id'] for track in tracks]
-            user_ratings = {
-                rating.track_id: rating.rating 
-                for rating in TrackRating.objects.filter(
-                    user=request.user, 
-                    track_id__in=track_ids
-                )
-            }
-            
-            # Get average ratings for tracks
-            avg_ratings = {
-                track_id: TrackRating.get_average_rating(track_id)
-                for track_id in track_ids
-            }
-            
-            # Add ratings to track data
-            for track in tracks:
-                track['user_rating'] = user_ratings.get(track['id'])
-                track['spotify_url'] = track['external_urls']['spotify']
-                track['preview_url'] = track['preview_url']
-                track['avg_rating'] = avg_ratings.get(track['id'], {'average': None, 'count': 0})
-            
-            results['tracks'] = tracks
-            
-            # Search for albums
-            album_results = sp.search(q=query, type='album', limit=10)
-            albums = album_results['albums']['items']
-            
-            # Add Spotify URLs to albums
-            for album in albums:
-                album['spotify_url'] = album['external_urls']['spotify']
-            
-            results['albums'] = albums
-            
+            # Test the token by making a simple request
+            sp.current_user()
         except Exception as e:
-            messages.error(request, 'Error searching Spotify. Please try again.')
-            logger.error(f"Spotify search error: {str(e)}")
-    
-    return render(request, 'spotify/search_results.html', {
-        'query': query,
-        'results': results
-    })
+            logger.warning(f"Spotify token expired or invalid: {str(e)}")
+            # Try to refresh the token
+            if refresh_spotify_token(request.user):
+                sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+            else:
+                return JsonResponse({
+                    'error': 'Error fetching Spotify data. Please reconnect your Spotify account.'
+                }, status=401)
+        
+        # Search for tracks
+        track_results = sp.search(q=query, type='track', limit=10)
+        tracks = track_results['tracks']['items']
+        
+        # Get user ratings for tracks
+        track_ids = [track['id'] for track in tracks]
+        user_ratings = {
+            rating.track_id: rating.rating 
+            for rating in TrackRating.objects.filter(
+                user=request.user, 
+                track_id__in=track_ids
+            )
+        }
+        
+        # Get average ratings for tracks
+        avg_ratings = {
+            track_id: TrackRating.get_average_rating(track_id)
+            for track_id in track_ids
+        }
+        
+        # Add ratings to track data
+        for track in tracks:
+            track['user_rating'] = user_ratings.get(track['id'])
+            track['spotify_url'] = track['external_urls']['spotify']
+            track['avg_rating'] = avg_ratings.get(track['id'], {'average': None, 'count': 0})
+        
+        results['tracks'] = tracks
+        
+        # Search for albums
+        album_results = sp.search(q=query, type='album', limit=10)
+        albums = album_results['albums']['items']
+        
+        # Add Spotify URLs to albums
+        for album in albums:
+            album['spotify_url'] = album['external_urls']['spotify']
+        
+        results['albums'] = albums
+        
+        return JsonResponse(results)
+        
+    except Exception as e:
+        logger.error(f"Spotify search error: {str(e)}")
+        return JsonResponse({
+            'error': 'Error searching Spotify. Please try again.'
+        }, status=500)
 
 @login_required
 def rate_track(request):
@@ -193,13 +241,13 @@ def rate_track(request):
             
             Post.objects.create(
                 user=request.user,
-                post_type='rating',
+                post_type='track',  # Changed from 'rating' to 'track' to enable queue functionality
                 content=f"Rated this song {rating}/5 stars!",
                 spotify_id=track_id,
                 spotify_name=track_name,
                 spotify_artist=artist_name,
                 spotify_image_url=track['album']['images'][0]['url'] if track['album']['images'] else '',
-                spotify_preview_url=track['preview_url'],
+                spotify_preview_url=track['preview_url'],  # This is needed for the queue button
                 spotify_url=track['external_urls']['spotify']
             )
             
@@ -220,3 +268,105 @@ def rate_track(request):
         'success': False,
         'message': 'Invalid request method'
     }, status=400)
+
+@login_required
+def get_spotify_token(request):
+    """Get Spotify access token for Web Playback SDK"""
+    if not request.user.spotify_access_token:
+        return JsonResponse({'error': 'Spotify account not connected'}, status=401)
+    
+    try:
+        # Create SpotifyOAuth instance
+        sp_oauth = SpotifyOAuth(
+            client_id=settings.SPOTIFY_CLIENT_ID,
+            client_secret=settings.SPOTIFY_CLIENT_SECRET,
+            redirect_uri=settings.SPOTIFY_REDIRECT_URI,
+            scope=settings.SPOTIFY_SCOPES
+        )
+        
+        # Try to refresh the token
+        token_info = sp_oauth.refresh_access_token(request.user.spotify_refresh_token)
+        if token_info:
+            request.user.spotify_access_token = token_info['access_token']
+            request.user.save()
+            return JsonResponse({'access_token': token_info['access_token']})
+        
+        return JsonResponse({'access_token': request.user.spotify_access_token})
+    except Exception as e:
+        logger.error(f"Error getting Spotify token: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def search_page(request):
+    """Render search results page"""
+    if not request.user.spotify_access_token:
+        messages.error(request, 'Please connect your Spotify account first.')
+        return redirect('profile')
+    
+    query = request.GET.get('q', '')
+    if not query:
+        return render(request, 'spotify/search.html', {
+            'error': 'Search query is required.'
+        })
+    
+    try:
+        # Try to create Spotify client with current token
+        try:
+            sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+            # Test the token by making a simple request
+            sp.current_user()
+        except Exception as e:
+            logger.warning(f"Spotify token expired or invalid: {str(e)}")
+            # Try to refresh the token
+            if refresh_spotify_token(request.user):
+                sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+            else:
+                messages.error(request, 'Error fetching Spotify data. Please reconnect your Spotify account.')
+                return redirect('profile')
+        
+        # Search for tracks
+        track_results = sp.search(q=query, type='track', limit=10)
+        tracks = track_results['tracks']['items']
+        
+        # Get user ratings for tracks
+        track_ids = [track['id'] for track in tracks]
+        user_ratings = {
+            rating.track_id: rating.rating 
+            for rating in TrackRating.objects.filter(
+                user=request.user, 
+                track_id__in=track_ids
+            )
+        }
+        
+        # Get average ratings for tracks
+        avg_ratings = {
+            track_id: TrackRating.get_average_rating(track_id)
+            for track_id in track_ids
+        }
+        
+        # Add ratings to track data
+        for track in tracks:
+            track['user_rating'] = user_ratings.get(track['id'])
+            track['spotify_url'] = track['external_urls']['spotify']
+            track['avg_rating'] = avg_ratings.get(track['id'], {'average': None, 'count': 0})
+        
+        # Search for albums
+        album_results = sp.search(q=query, type='album', limit=10)
+        albums = album_results['albums']['items']
+        
+        # Add Spotify URLs to albums
+        for album in albums:
+            album['spotify_url'] = album['external_urls']['spotify']
+        
+        context = {
+            'query': query,
+            'tracks': tracks,
+            'albums': albums,
+        }
+        
+        return render(request, 'spotify/search.html', context)
+    
+    except Exception as e:
+        logger.error(f"Error in search_page: {str(e)}")
+        messages.error(request, 'Error searching Spotify. Please try again.')
+        return redirect('profile')

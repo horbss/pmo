@@ -24,17 +24,11 @@ from spotify import views as spotify_views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', core_views.home, name='home'),
-    path('register/', core_views.register, name='register'),
     path('profile/', core_views.profile, name='profile'),
-    path('profile/edit-username/', core_views.edit_username, name='edit_username'),
+    path('edit-username/', core_views.edit_username, name='edit_username'),
     path('login/', auth_views.LoginView.as_view(template_name='core/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
-    
-    # Spotify authentication URLs
-    path('spotify/login/', spotify_views.spotify_login, name='spotify_login'),
-    path('spotify/callback/', spotify_views.spotify_callback, name='spotify_callback'),
-    path('spotify/disconnect/', spotify_views.spotify_disconnect, name='spotify_disconnect'),
-    path('spotify/search/', spotify_views.spotify_search, name='spotify_search'),
-    path('spotify/rate/', spotify_views.rate_track, name='rate_track'),
+    path('register/', core_views.register, name='register'),
+    path('spotify/', include('spotify.urls')),
     path('social/', include('social.urls')),
 ]

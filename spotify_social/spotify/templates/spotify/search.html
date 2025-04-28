@@ -1,0 +1,331 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Search Results - Spotify Social{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="card-title">Search Results for "{{ query }}"</h2>
+                    
+                    {% if error %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                    {% else %}
+                        {% if tracks %}
+                            <h3 class="mt-4">Tracks</h3>
+                            <div class="list-group">
+                                {% for track in tracks %}
+                                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <img src="{{ track.album.images.0.url }}" 
+                                                 alt="{{ track.name }}" 
+                                                 class="me-3"
+                                                 style="width: 40px; height: 40px;">
+                                            <div>
+                                                <strong>{{ track.name }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {% for artist in track.artists %}
+                                                        {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                </small>
+                                                {% if track.avg_rating.average %}
+                                                    <div class="mt-1">
+                                                        <small class="text-muted">
+                                                            Average Rating: {{ track.avg_rating.average|floatformat:1 }} 
+                                                            ({{ track.avg_rating.count }} ratings)
+                                                        </small>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <a href="{{ track.spotify_url }}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-outline-primary me-2">
+                                                <i class="bi bi-spotify"></i> Open in Spotify
+                                            </a>
+                                            <button class="btn btn-sm btn-primary create-post-button"
+                                                    data-post_type="track"
+                                                    data-spotify_id="{{ track.id }}"
+                                                    data-spotify_name="{{ track.name }}"
+                                                    data-spotify_artist="{% for artist in track.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                                                    data-spotify_image_url="{{ track.album.images.0.url }}"
+                                                    data-spotify_preview_url="{{ track.preview_url }}"
+                                                    data-spotify_link="{{ track.spotify_url }}">
+                                                Create Post
+                                            </button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        {% if albums %}
+                            <h3 class="mt-4">Albums</h3>
+                            <div class="list-group">
+                                {% for album in albums %}
+                                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <img src="{{ album.images.0.url }}" 
+                                                 alt="{{ album.name }}" 
+                                                 class="me-3"
+                                                 style="width: 40px; height: 40px;">
+                                            <div>
+                                                <strong>{{ album.name }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {% for artist in album.artists %}
+                                                        {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <a href="{{ album.spotify_url }}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-outline-primary me-2">
+                                                <i class="bi bi-spotify"></i> View Tracks
+                                            </a>
+                                            <button class="btn btn-sm btn-primary create-post-button"
+                                                    data-post_type="album"
+                                                    data-spotify_id="{{ album.id }}"
+                                                    data-spotify_name="{{ album.name }}"
+                                                    data-spotify_artist="{% for artist in album.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                                                    data-spotify_image_url="{{ album.images.0.url }}"
+                                                    data-spotify_preview_url="null"
+                                                    data-spotify_link="{{ album.spotify_url }}">
+                                                Create Post
+                                            </button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        {% if not tracks and not albums %}
+                            <p class="text-muted">No results found.</p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Post Creation Modal -->
+<div class="modal fade" id="createPostModal" tabindex="-1" aria-labelledby="createPostModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createPostModalLabel">Create Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="postForm" method="post" action="{% url 'social:create_post' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="post_type" id="modal_post_type">
+                    <input type="hidden" name="spotify_id" id="modal_spotify_id">
+                    <input type="hidden" name="spotify_name" id="modal_spotify_name">
+                    <input type="hidden" name="spotify_artist" id="modal_spotify_artist">
+                    <input type="hidden" name="spotify_image_url" id="modal_spotify_image_url">
+                    <input type="hidden" name="spotify_preview_url" id="modal_spotify_preview_url">
+                    <input type="hidden" name="spotify_link" id="modal_spotify_link">
+                    
+                    <div class="mb-3">
+                        <label for="postContent" class="form-label">What's on your mind?</label>
+                        <textarea class="form-control" id="postContent" name="content" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Rating (optional)</label>
+                        <div class="rating">
+                            {% for i in "12345"|make_list %}
+                                <input type="radio" name="rating" value="{{ i }}" id="star{{ i }}">
+                                <label for="star{{ i }}" class="bi bi-star"></label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="submitButton">Post</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">Success</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastBody">
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const createPostModal = new bootstrap.Modal(document.getElementById('createPostModal'));
+    const toast = new bootstrap.Toast(document.getElementById('toast'));
+    const createPostButtons = document.querySelectorAll('.create-post-button');
+    let isSubmitting = false;
+    let formSubmitted = false;
+    
+    createPostButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const data = this.dataset;
+            
+            // Update modal form fields
+            document.getElementById('modal_post_type').value = data.post_type;
+            document.getElementById('modal_spotify_id').value = data.spotify_id;
+            document.getElementById('modal_spotify_name').value = data.spotify_name;
+            document.getElementById('modal_spotify_artist').value = data.spotify_artist;
+            document.getElementById('modal_spotify_image_url').value = data.spotify_image_url;
+            document.getElementById('modal_spotify_preview_url').value = data.spotify_preview_url;
+            document.getElementById('modal_spotify_link').value = data.spotify_link;
+            
+            // Reset form state
+            formSubmitted = false;
+            isSubmitting = false;
+            
+            // Clear previous content and rating
+            document.getElementById('postContent').value = '';
+            document.querySelectorAll('input[name="rating"]').forEach(radio => {
+                radio.checked = false;
+            });
+            
+            // Show the modal
+            createPostModal.show();
+        });
+    });
+    
+    // Handle form submission with protection against double submissions
+    const postForm = document.getElementById('postForm');
+    
+    // Remove any existing event listeners by cloning and replacing the form
+    const newPostForm = postForm.cloneNode(true);
+    postForm.parentNode.replaceChild(newPostForm, postForm);
+    
+    // Add event listener to the new form
+    newPostForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Multiple protection against double submission
+        if (isSubmitting || formSubmitted) return;
+        
+        isSubmitting = true;
+        formSubmitted = true;
+        
+        const submitButton = document.getElementById('submitButton');
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Posting...';
+        
+        const formData = new FormData(this);
+        
+        // Handle the preview URL for albums
+        const postType = formData.get('post_type');
+        const previewUrl = formData.get('spotify_preview_url');
+        
+        if (postType === 'album' && (previewUrl === '' || previewUrl === 'null' || previewUrl === null)) {
+            formData.set('spotify_preview_url', '');
+        }
+        
+        // Add a unique identifier to prevent caching
+        formData.append('_', Date.now().toString());
+        
+        fetch(this.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('toastTitle').textContent = 'Success';
+                document.getElementById('toastBody').textContent = data.message;
+                toast.show();
+                createPostModal.hide();
+                
+                // Redirect instead of reload to prevent form resubmission
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('_', Date.now().toString());
+                window.location.href = currentUrl.toString();
+            } else {
+                document.getElementById('toastTitle').textContent = 'Error';
+                document.getElementById('toastBody').textContent = data.message;
+                toast.show();
+                formSubmitted = false;
+            }
+        })
+        .catch(error => {
+            document.getElementById('toastTitle').textContent = 'Error';
+            document.getElementById('toastBody').textContent = 'An error occurred while creating the post.';
+            toast.show();
+            formSubmitted = false;
+        })
+        .finally(() => {
+            isSubmitting = false;
+            submitButton.disabled = false;
+            submitButton.innerHTML = 'Post';
+        });
+    });
+    
+    // Cleanup form state when modal is hidden
+    document.getElementById('createPostModal').addEventListener('hidden.bs.modal', function() {
+        formSubmitted = false;
+        isSubmitting = false;
+    });
+});
+</script>
+
+<style>
+.rating {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+}
+
+.rating input {
+    display: none;
+}
+
+.rating label {
+    font-size: 1.5rem;
+    color: #ddd;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.rating label:hover,
+.rating label:hover ~ label,
+.rating input:checked ~ label {
+    color: #ffc107;
+}
+
+.toast {
+    background-color: #fff;
+}
+
+.toast.bg-success .toast-header {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.toast.bg-danger .toast-header {
+    background-color: #f8d7da;
+    color: #842029;
+}
+</style>
+{% endblock %}
+{% endblock %} 
