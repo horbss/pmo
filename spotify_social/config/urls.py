@@ -20,15 +20,16 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from core import views as core_views
 from spotify import views as spotify_views
+from core.views import home, edit_username, update_top_album
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', core_views.home, name='home'),
+    path('', home, name='home'),
     path('profile/', core_views.profile, name='profile'),
-    path('edit-username/', core_views.edit_username, name='edit_username'),
+    path('edit-username/', edit_username, name='edit_username'),
     path('login/', auth_views.LoginView.as_view(template_name='core/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
-    path('register/', core_views.register, name='register'),
+    path('update-top-album/', update_top_album, name='update_top_album'),
     path('spotify/', include('spotify.urls')),
     path('social/', include('social.urls')),
 ]

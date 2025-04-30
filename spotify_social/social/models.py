@@ -18,6 +18,7 @@ class Post(models.Model):
     spotify_image_url = models.URLField(blank=True)
     spotify_preview_url = models.URLField(blank=True, null=True)
     spotify_url = models.URLField()
+    rating = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     

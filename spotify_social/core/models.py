@@ -4,9 +4,22 @@ from django.db import models
 # Create your models here.
 
 class User(AbstractUser):
-    spotify_id = models.CharField(max_length=100, blank=True, null=True)
+    spotify_id = models.CharField(max_length=255, blank=True, null=True)
     spotify_access_token = models.CharField(max_length=255, blank=True, null=True)
     spotify_refresh_token = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Top 3 albums picked by user
+    top_album1_id = models.CharField(max_length=255, blank=True, null=True)
+    top_album1_name = models.CharField(max_length=255, blank=True, null=True)
+    top_album1_image = models.URLField(max_length=500, blank=True, null=True)
+    
+    top_album2_id = models.CharField(max_length=255, blank=True, null=True)
+    top_album2_name = models.CharField(max_length=255, blank=True, null=True)
+    top_album2_image = models.URLField(max_length=500, blank=True, null=True)
+    
+    top_album3_id = models.CharField(max_length=255, blank=True, null=True)
+    top_album3_name = models.CharField(max_length=255, blank=True, null=True)
+    top_album3_image = models.URLField(max_length=500, blank=True, null=True)
     
     groups = models.ManyToManyField(
         'auth.Group',

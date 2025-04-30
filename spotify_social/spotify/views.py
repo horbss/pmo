@@ -214,6 +214,7 @@ def spotify_search(request):
             'error': 'Error searching Spotify. Please try again.'
         }, status=500)
 
+# create a post based on the track rating - we want to remove this . 
 @login_required
 def rate_track(request):
     """Handle track rating submission"""
@@ -370,3 +371,30 @@ def search_page(request):
         logger.error(f"Error in search_page: {str(e)}")
         messages.error(request, 'Error searching Spotify. Please try again.')
         return redirect('profile')
+
+@login_required
+def get_top_albums(request):
+    if not request.user.spotify_access_token:
+        return JsonResponse({'error': 'Spotify not connected'}, status=400)
+        
+    try:
+        sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+        top_albums = sp.current_user_top_artists(limit=3, time_range='medium_term')
+        
+        # Get the top albums for each artist
+        albums = []
+        for artist in top_albums['items']:
+            artist_albums = sp.artist_albums(artist['id'], album_type='album', limit=1)
+            if artist_albums['items']:
+                album = artist_albums['items'][0]
+                albums.append({
+                    'id': album['id'],
+                    'name': album['name'],
+                    'artists': [{'name': artist['name']} for artist in album['artists']],
+                    'images': album['images'],
+                    'spotify_url': album['external_urls']['spotify']
+                })
+                
+        return JsonResponse({'albums': albums})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

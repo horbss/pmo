@@ -4,10 +4,11 @@ from django.contrib.auth import login
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from .models import User
-from .forms import CustomUserCreationForm, UsernameEditForm
+from .forms import UsernameEditForm
 from social.models import Post
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from django.http import JsonResponse
 
 def home(request):
     return render(request, 'core/home.html')
@@ -53,18 +54,6 @@ def profile(request):
         'posts': posts
     })
 
-def register(request):
-    if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            messages.success(request, 'Registration successful!')
-            return redirect('home')
-    else:
-        form = CustomUserCreationForm()
-    return render(request, 'core/register.html', {'form': form})
-
 @login_required
 def edit_username(request):
     if request.method == 'POST':
@@ -79,3 +68,35 @@ def edit_username(request):
     return render(request, 'core/edit_username.html', {
         'form': form
     })
+
+@login_required
+def update_top_album(request):
+    if request.method == 'POST':
+        position = request.POST.get('position')
+        album_id = request.POST.get('album_id')
+        album_name = request.POST.get('album_name')
+        album_image = request.POST.get('album_image')
+        
+        if not all([position, album_id, album_name, album_image]):
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+            
+        user = request.user
+        if position == '1':
+            user.top_album1_id = album_id
+            user.top_album1_name = album_name
+            user.top_album1_image = album_image
+        elif position == '2':
+            user.top_album2_id = album_id
+            user.top_album2_name = album_name
+            user.top_album2_image = album_image
+        elif position == '3':
+            user.top_album3_id = album_id
+            user.top_album3_name = album_name
+            user.top_album3_image = album_image
+        else:
+            return JsonResponse({'error': 'Invalid position'}, status=400)
+            
+        user.save()
+        return JsonResponse({'success': True})
+        
+    return JsonResponse({'error': 'Invalid request method'}, status=400)

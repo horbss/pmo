@@ -111,7 +111,8 @@ def create_post(request):
                 spotify_artist=spotify_artist,
                 spotify_image_url=spotify_image_url,
                 spotify_preview_url=spotify_preview_url,
-                spotify_url=spotify_link
+                spotify_url=spotify_link,
+                rating=rating if rating else None
             )
             logger.info(f"Created post {post.id} for {post_type} {spotify_id}")
         except Exception as post_error:
@@ -131,7 +132,7 @@ def create_post(request):
                     defaults={
                         'track_name': spotify_name,
                         'artist_name': spotify_artist,
-                        'rating': int(rating)
+                        'rating': rating
                     }
                 )
                 logger.info(f"Updated rating for track {spotify_id} to {rating}")
