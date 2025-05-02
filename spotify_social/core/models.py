@@ -36,5 +36,18 @@ class User(AbstractUser):
         verbose_name='user permissions',
     )
     
+    def get_top_albums(self):
+        """Return a list of dictionaries containing top album data"""
+        albums = []
+        for i in range(1, 4):
+            album = {
+                'id': getattr(self, f'top_album{i}_id'),
+                'name': getattr(self, f'top_album{i}_name'),
+                'image': getattr(self, f'top_album{i}_image'),
+                'position': i
+            }
+            albums.append(album)
+        return albums
+
     def __str__(self):
         return self.username

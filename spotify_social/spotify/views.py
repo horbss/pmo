@@ -379,21 +379,34 @@ def get_top_albums(request):
         
     try:
         sp = spotipy.Spotify(auth=request.user.spotify_access_token)
-        top_albums = sp.current_user_top_artists(limit=3, time_range='medium_term')
         
-        # Get the top albums for each artist
-        albums = []
-        for artist in top_albums['items']:
-            artist_albums = sp.artist_albums(artist['id'], album_type='album', limit=1)
-            if artist_albums['items']:
-                album = artist_albums['items'][0]
-                albums.append({
-                    'id': album['id'],
+        # Get user's top tracks
+        top_tracks = sp.current_user_top_tracks(limit=50, time_range='medium_term')
+        
+        # Create a dictionary to store unique albums
+        albums_dict = {}
+        
+        # Process each track and extract album information
+        for track in top_tracks['items']:
+            album = track['album']
+            album_id = album['id']
+            
+            # Only add the album if we haven't seen it before
+            if album_id not in albums_dict:
+                albums_dict[album_id] = {
+                    'id': album_id,
                     'name': album['name'],
-                    'artists': [{'name': artist['name']} for artist in album['artists']],
+                    'artists': album['artists'],
                     'images': album['images'],
                     'spotify_url': album['external_urls']['spotify']
-                })
+                }
+            
+            # Stop once we have 3 unique albums
+            if len(albums_dict) >= 3:
+                break
+        
+        # Convert dictionary to list
+        albums = list(albums_dict.values())
                 
         return JsonResponse({'albums': albums})
     except Exception as e:
