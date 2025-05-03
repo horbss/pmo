@@ -451,3 +451,45 @@ def remove_from_playlist(request):
             'success': False,
             'message': 'Error removing track from playlist'
         })
+
+@login_required
+def get_album_tracks(request, album_id):
+    """Get all tracks from an album"""
+    if not request.user.spotify_access_token:
+        return JsonResponse({
+            'error': 'Please connect your Spotify account first.'
+        }, status=401)
+    
+    try:
+        # Try to create Spotify client with current token
+        try:
+            sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+            # Test the token by making a simple request
+            sp.current_user()
+        except Exception as e:
+            logger.warning(f"Spotify token expired or invalid: {str(e)}")
+            # Try to refresh the token
+            if refresh_spotify_token(request.user):
+                sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+            else:
+                return JsonResponse({
+                    'error': 'Error fetching Spotify data. Please reconnect your Spotify account.'
+                }, status=401)
+        
+        # Get album tracks
+        album_tracks = sp.album_tracks(album_id)
+        tracks = album_tracks['items']
+        
+        # Add Spotify URLs to tracks
+        for track in tracks:
+            track['spotify_url'] = track['external_urls']['spotify']
+        
+        return JsonResponse({
+            'tracks': tracks
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching album tracks: {str(e)}")
+        return JsonResponse({
+            'error': 'Error fetching album tracks. Please try again.'
+        }, status=500)

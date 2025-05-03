@@ -243,20 +243,32 @@
                                     <textarea class="form-control" id="content" name="content" rows="3"></textarea>
                                 </div>
                                 
-                                <!-- Optional Rating -->
-                                <div class="mb-3">
-                                    <label class="form-label">Rating (optional)</label>
-                                    <div class="input-group" style="max-width: 200px;">
-                                        <input type="number" 
-                                               class="form-control" 
-                                               name="rating" 
-                                               min="1" 
-                                               max="10" 
-                                               step="0.1"
-                                               placeholder="1.0-10.0">
-                                        <span class="input-group-text">/10</span>
+                                <!-- Album-specific fields -->
+                                <div id="album-fields" class="mb-3" style="display: none;">
+                                    <!-- Rating -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Rating</label>
+                                        <div class="input-group" style="max-width: 200px;">
+                                            <input type="number" 
+                                                   class="form-control" 
+                                                   name="rating" 
+                                                   min="1" 
+                                                   max="10" 
+                                                   step="0.1"
+                                                   placeholder="1.0-10.0"
+                                                   required>
+                                            <span class="input-group-text">/10</span>
+                                        </div>
+                                        <small class="text-muted">Enter a rating from 1.0 to 10.0</small>
                                     </div>
-                                    <small class="text-muted">Enter a rating from 1.0 to 10.0</small>
+                                    
+                                    <!-- Favorite Track Selection -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Favorite Track (Optional)</label>
+                                        <select class="form-select" name="favorite_track" id="favorite-track-select">
+                                            <option value="">Select a favorite track...</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-primary" id="submit-post" disabled>Create Post</button>
@@ -650,6 +662,30 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('selected-name').textContent = data.name;
         document.getElementById('selected-artist').textContent = data.artist;
         
+        // Show/hide album fields based on type
+        const albumFields = document.getElementById('album-fields');
+        if (data.type === 'album') {
+            albumFields.style.display = 'block';
+            // Fetch album tracks
+            fetch(`/spotify/get-album-tracks/${data.id}/`)
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('favorite-track-select');
+                    select.innerHTML = '<option value="">Select a favorite track...</option>';
+                    data.tracks.forEach(track => {
+                        const option = document.createElement('option');
+                        option.value = track.id;
+                        option.textContent = `${track.name} - ${track.artists.map(a => a.name).join(', ')}`;
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching album tracks:', error);
+                });
+        } else {
+            albumFields.style.display = 'none';
+        }
+        
         selectedItem.style.display = 'block';
         postSearchResults.style.display = 'none';
         submitButton.disabled = false;
@@ -864,6 +900,45 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('selected-image').src = data.spotify_image_url;
             document.getElementById('selected-name').textContent = data.spotify_name;
             document.getElementById('selected-artist').textContent = data.spotify_artist;
+            
+            // Show/hide album fields based on post type
+            const albumFields = document.getElementById('album-fields');
+            if (data.post_type === 'album') {
+                albumFields.style.display = 'block';
+                // Show loading state in the dropdown
+                const select = document.getElementById('favorite-track-select');
+                select.innerHTML = '<option value="">Loading tracks...</option>';
+                select.disabled = true;
+                
+                // Fetch album tracks
+                fetch(`/spotify/get-album-tracks/${data.spotify_id}/`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                        select.innerHTML = '<option value="">Select a favorite track...</option>';
+                        data.tracks.forEach(track => {
+                            const option = document.createElement('option');
+                            option.value = track.id;
+                            option.textContent = `${track.name} - ${track.artists.map(a => a.name).join(', ')}`;
+                            select.appendChild(option);
+                        });
+                        select.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching album tracks:', error);
+                        select.innerHTML = '<option value="">Error loading tracks</option>';
+                        select.disabled = true;
+                    });
+            } else {
+                albumFields.style.display = 'none';
+            }
             
             // Show selected item and enable submit button
             document.getElementById('selected-item').style.display = 'block';
