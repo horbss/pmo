@@ -50,20 +50,34 @@
                     <div class="card mb-4">
                         <div class="card-body">
                             <h3 class="card-title">Currently Playing</h3>
-                            <div class="d-flex align-items-center">
-                                {% if currently_playing.album.images %}
-                                    <img src="{{ currently_playing.album.images.0.url }}" 
-                                         alt="Album Cover" 
-                                         class="me-3"
-                                         style="width: 64px; height: 64px;">
-                                {% endif %}
-                                <div>
-                                    <h5 class="mb-1">{{ currently_playing.name }}</h5>
-                                    <p class="mb-0">
-                                        {% for artist in currently_playing.artists %}
-                                            {{ artist.name }}{% if not forloop.last %}, {% endif %}
-                                        {% endfor %}
-                                    </p>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    {% if currently_playing.album.images %}
+                                        <img src="{{ currently_playing.album.images.0.url }}" 
+                                             alt="Album Cover" 
+                                             class="me-3"
+                                             style="width: 64px; height: 64px;">
+                                    {% endif %}
+                                    <div>
+                                        <h5 class="mb-1">{{ currently_playing.name }}</h5>
+                                        <p class="mb-0">
+                                            {% for artist in currently_playing.artists %}
+                                                {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                            {% endfor %}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-primary create-post-button"
+                                            data-post_type="track"
+                                            data-spotify_id="{{ currently_playing.id }}"
+                                            data-spotify_name="{{ currently_playing.name }}"
+                                            data-spotify_artist="{% for artist in currently_playing.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                                            data-spotify_image_url="{{ currently_playing.album.images.0.url }}"
+                                            data-spotify_preview_url="{{ currently_playing.preview_url }}"
+                                            data-spotify_link="{{ currently_playing.spotify_url }}">
+                                        <i class="bi bi-chat"></i> Create Post
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -291,19 +305,19 @@
                                     <a href="{{ post.spotify_url }}" 
                                        target="_blank" 
                                        class="btn btn-sm btn-outline-primary me-2">
-                                        <i class="bi bi-spotify"></i> {% if post.post_type == 'track' %}Open in Spotify{% else %}View Tracks{% endif %}
+                                        <i class="bi bi-spotify"></i> {% if post.post_type == 'track' %}Open{% else %}View Tracks{% endif %}
                                     </a>
                                     
                                     {% if post.post_type == 'track' %}
                                         <button class="btn btn-sm btn-outline-secondary add-to-queue"
                                                 data-spotify-uri="{{ post.get_spotify_uri }}">
-                                            <i class="bi bi-play-circle"></i> Add to Queue
+                                            <i class="bi bi-play-circle"></i> Queue
                                         </button>
                                     {% endif %}
                                     {% if post.post_type == 'track' %}
                                         <button class="btn btn-sm btn-outline-secondary listen-later"
                                                 data-spotify-uri="{{ post.get_spotify_uri }}">
-                                            <i class="bi bi-plus-circle"></i> Add to Listen Later
+                                            <i class="bi bi-plus-circle"></i> Listen Later
                                         </button>
                                     {% endif %}
 
@@ -824,11 +838,42 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(data => {
-                alert('Added to Listen Later'); // Or use a toast for better UX
+                alert(data.message); // Or use a toast for better UX
             })
             .catch(() => {
                 alert('Error adding to Listen Later');
             });
+        });
+    });
+
+    // Handle create post buttons (including the one in currently playing)
+    document.querySelectorAll('.create-post-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const data = this.dataset;
+            
+            // Update form fields
+            document.getElementById('spotify_link').value = data.spotify_link;
+            document.getElementById('post_type').value = data.post_type;
+            document.getElementById('spotify_id').value = data.spotify_id;
+            document.getElementById('spotify_name').value = data.spotify_name;
+            document.getElementById('spotify_artist').value = data.spotify_artist;
+            document.getElementById('spotify_image_url').value = data.spotify_image_url;
+            document.getElementById('spotify_preview_url').value = data.spotify_preview_url;
+            
+            // Update selected item display
+            document.getElementById('selected-image').src = data.spotify_image_url;
+            document.getElementById('selected-name').textContent = data.spotify_name;
+            document.getElementById('selected-artist').textContent = data.spotify_artist;
+            
+            // Show selected item and enable submit button
+            document.getElementById('selected-item').style.display = 'block';
+            document.getElementById('submit-post').disabled = false;
+            
+            // Scroll to the post form
+            document.getElementById('create-post-form').scrollIntoView({ behavior: 'smooth' });
+            
+            // Focus the content textarea
+            document.getElementById('content').focus();
         });
     });
 });

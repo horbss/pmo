@@ -5,109 +5,163 @@
 {% block content %}
 <div class="container">
     <div class="row">
-        <div class="col-md-8 offset-md-2">
+        <div class="col-md-10 offset-md-1">
             <div class="card mb-4">
                 <div class="card-body">
-                    <h2 class="card-title">Search Results for "{{ query }}"</h2>
+                    <h2 class="card-title mb-4">Search Results for "{{ query }}"</h2>
                     
                     {% if error %}
                         <div class="alert alert-danger">{{ error }}</div>
                     {% else %}
-                        {% if tracks %}
-                            <h3 class="mt-4">Tracks</h3>
-                            <div class="list-group">
-                                {% for track in tracks %}
-                                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                                        <div class="d-flex align-items-center">
-                                            <img src="{{ track.album.images.0.url }}" 
-                                                 alt="{{ track.name }}" 
-                                                 class="me-3"
-                                                 style="width: 40px; height: 40px;">
-                                            <div>
-                                                <strong>{{ track.name }}</strong>
-                                                <br>
-                                                <small class="text-muted">
-                                                    {% for artist in track.artists %}
-                                                        {{ artist.name }}{% if not forloop.last %}, {% endif %}
-                                                    {% endfor %}
-                                                </small>
-                                                {% if track.avg_rating.average %}
-                                                    <div class="mt-1">
-                                                        <small class="text-muted">
-                                                            Average Rating: {{ track.avg_rating.average|floatformat:1 }} 
-                                                            ({{ track.avg_rating.count }} ratings)
-                                                        </small>
+                        <!-- Search Menu Bar -->
+                        <div class="search-menu mb-4">
+                            <div class="btn-group" role="group">
+                                <button type="button" 
+                                        class="btn btn-outline-primary active" 
+                                        data-type="tracks">
+                                    <i class="bi bi-music-note"></i> Tracks
+                                    {% if tracks %}
+                                        <span class="badge bg-primary ms-1">{{ tracks|length }}</span>
+                                    {% endif %}
+                                </button>
+                                <button type="button" 
+                                        class="btn btn-outline-primary" 
+                                        data-type="albums">
+                                    <i class="bi bi-disc"></i> Albums
+                                    {% if albums %}
+                                        <span class="badge bg-primary ms-1">{{ albums|length }}</span>
+                                    {% endif %}
+                                </button>
+                                <!-- Placeholder for future search types -->
+                                <button type="button" 
+                                        class="btn btn-outline-primary" 
+                                        data-type="artists" 
+                                        disabled>
+                                    <i class="bi bi-person"></i> Artists
+                                </button>
+                                <button type="button" 
+                                        class="btn btn-outline-primary" 
+                                        data-type="playlists" 
+                                        disabled>
+                                    <i class="bi bi-list"></i> Playlists
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search Results -->
+                        <div class="search-results">
+                            <!-- Tracks Section -->
+                            <div class="search-section" id="tracks-section">
+                                {% if tracks %}
+                                    <div class="row row-cols-1 row-cols-md-2 g-4">
+                                        {% for track in tracks %}
+                                            <div class="col">
+                                                <div class="card h-100">
+                                                    <div class="card-body">
+                                                        <div class="d-flex align-items-center mb-3">
+                                                            <img src="{{ track.album.images.0.url }}" 
+                                                                 alt="{{ track.name }}" 
+                                                                 class="me-3 rounded"
+                                                                 style="width: 64px; height: 64px;">
+                                                            <div>
+                                                                <h5 class="card-title mb-1">{{ track.name }}</h5>
+                                                                <p class="card-text text-muted mb-0">
+                                                                    {% for artist in track.artists %}
+                                                                        {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                                                    {% endfor %}
+                                                                </p>
+                                                                {% if track.avg_rating.average %}
+                                                                    <small class="text-muted">
+                                                                        Rating: {{ track.avg_rating.average|floatformat:1 }} 
+                                                                        ({{ track.avg_rating.count }})
+                                                                    </small>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            <a href="{{ track.spotify_url }}" 
+                                                               target="_blank" 
+                                                               class="btn btn-sm btn-outline-primary">
+                                                                <i class="bi bi-spotify"></i> Open
+                                                            </a>
+                                                            <button class="btn btn-sm btn-outline-secondary add-to-queue"
+                                                                    data-spotify-uri="spotify:track:{{ track.id }}">
+                                                                <i class="bi bi-play-circle"></i> Queue
+                                                            </button>
+                                                            <button class="btn btn-sm btn-outline-secondary listen-later"
+                                                                    data-spotify-uri="spotify:track:{{ track.id }}">
+                                                                <i class="bi bi-plus-circle"></i> Listen Later
+                                                            </button>
+                                                            <button class="btn btn-sm btn-primary create-post-button"
+                                                                    data-post_type="track"
+                                                                    data-spotify_id="{{ track.id }}"
+                                                                    data-spotify_name="{{ track.name }}"
+                                                                    data-spotify_artist="{% for artist in track.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                                                                    data-spotify_image_url="{{ track.album.images.0.url }}"
+                                                                    data-spotify_preview_url="{{ track.preview_url }}"
+                                                                    data-spotify_link="{{ track.spotify_url }}">
+                                                                <i class="bi bi-chat"></i> Post
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                {% endif %}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <a href="{{ track.spotify_url }}" 
-                                               target="_blank" 
-                                               class="btn btn-sm btn-outline-primary me-2">
-                                                <i class="bi bi-spotify"></i> Open in Spotify
-                                            </a>
-                                            <button class="btn btn-sm btn-primary create-post-button"
-                                                    data-post_type="track"
-                                                    data-spotify_id="{{ track.id }}"
-                                                    data-spotify_name="{{ track.name }}"
-                                                    data-spotify_artist="{% for artist in track.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
-                                                    data-spotify_image_url="{{ track.album.images.0.url }}"
-                                                    data-spotify_preview_url="{{ track.preview_url }}"
-                                                    data-spotify_link="{{ track.spotify_url }}">
-                                                Create Post
-                                            </button>
-                                        </div>
+                                        {% endfor %}
                                     </div>
-                                {% endfor %}
+                                {% else %}
+                                    <p class="text-muted">No tracks found.</p>
+                                {% endif %}
                             </div>
-                        {% endif %}
-                        
-                        {% if albums %}
-                            <h3 class="mt-4">Albums</h3>
-                            <div class="list-group">
-                                {% for album in albums %}
-                                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                                        <div class="d-flex align-items-center">
-                                            <img src="{{ album.images.0.url }}" 
-                                                 alt="{{ album.name }}" 
-                                                 class="me-3"
-                                                 style="width: 40px; height: 40px;">
-                                            <div>
-                                                <strong>{{ album.name }}</strong>
-                                                <br>
-                                                <small class="text-muted">
-                                                    {% for artist in album.artists %}
-                                                        {{ artist.name }}{% if not forloop.last %}, {% endif %}
-                                                    {% endfor %}
-                                                </small>
+
+                            <!-- Albums Section -->
+                            <div class="search-section d-none" id="albums-section">
+                                {% if albums %}
+                                    <div class="row row-cols-1 row-cols-md-2 g-4">
+                                        {% for album in albums %}
+                                            <div class="col">
+                                                <div class="card h-100">
+                                                    <div class="card-body">
+                                                        <div class="d-flex align-items-center mb-3">
+                                                            <img src="{{ album.images.0.url }}" 
+                                                                 alt="{{ album.name }}" 
+                                                                 class="me-3 rounded"
+                                                                 style="width: 64px; height: 64px;">
+                                                            <div>
+                                                                <h5 class="card-title mb-1">{{ album.name }}</h5>
+                                                                <p class="card-text text-muted mb-0">
+                                                                    {% for artist in album.artists %}
+                                                                        {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                                                    {% endfor %}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            <a href="{{ album.spotify_url }}" 
+                                                               target="_blank" 
+                                                               class="btn btn-sm btn-outline-primary">
+                                                                <i class="bi bi-spotify"></i> View Tracks
+                                                            </a>
+                                                            <button class="btn btn-sm btn-primary create-post-button"
+                                                                    data-post_type="album"
+                                                                    data-spotify_id="{{ album.id }}"
+                                                                    data-spotify_name="{{ album.name }}"
+                                                                    data-spotify_artist="{% for artist in album.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                                                                    data-spotify_image_url="{{ album.images.0.url }}"
+                                                                    data-spotify_preview_url="null"
+                                                                    data-spotify_link="{{ album.spotify_url }}">
+                                                                <i class="bi bi-chat"></i> Post
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <a href="{{ album.spotify_url }}" 
-                                               target="_blank" 
-                                               class="btn btn-sm btn-outline-primary me-2">
-                                                <i class="bi bi-spotify"></i> View Tracks
-                                            </a>
-                                            <button class="btn btn-sm btn-primary create-post-button"
-                                                    data-post_type="album"
-                                                    data-spotify_id="{{ album.id }}"
-                                                    data-spotify_name="{{ album.name }}"
-                                                    data-spotify_artist="{% for artist in album.artists %}{{ artist.name }}{% if not forloop.last %}, {% endif %}{% endfor %}"
-                                                    data-spotify_image_url="{{ album.images.0.url }}"
-                                                    data-spotify_preview_url="null"
-                                                    data-spotify_link="{{ album.spotify_url }}">
-                                                Create Post
-                                            </button>
-                                        </div>
+                                        {% endfor %}
                                     </div>
-                                {% endfor %}
+                                {% else %}
+                                    <p class="text-muted">No albums found.</p>
+                                {% endif %}
                             </div>
-                        {% endif %}
-                        
-                        {% if not tracks and not albums %}
-                            <p class="text-muted">No results found.</p>
-                        {% endif %}
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -170,6 +224,74 @@
     </div>
 </div>
 
+<style>
+/* Search Menu Styles */
+.search-menu {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+}
+
+.search-menu .btn-group {
+    width: 100%;
+}
+
+.search-menu .btn {
+    flex: 1;
+    white-space: nowrap;
+    padding: 0.5rem 1rem;
+}
+
+.search-menu .btn i {
+    margin-right: 0.5rem;
+}
+
+/* Card Styles */
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* Button Styles */
+.btn-group {
+    gap: 0.5rem;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Toast Styles */
+.toast {
+    background-color: #fff;
+}
+
+.toast.bg-success .toast-header {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.toast.bg-danger .toast-header {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+/* Badge Styles */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25em 0.6em;
+}
+</style>
+
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -179,6 +301,30 @@ document.addEventListener('DOMContentLoaded', function() {
     let isSubmitting = false;
     let formSubmitted = false;
     
+    // Handle search menu switching
+    const menuButtons = document.querySelectorAll('.search-menu .btn');
+    const searchSections = document.querySelectorAll('.search-section');
+    
+    menuButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.dataset.type;
+            
+            // Update active state
+            menuButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show/hide sections
+            searchSections.forEach(section => {
+                if (section.id === `${type}-section`) {
+                    section.classList.remove('d-none');
+                } else {
+                    section.classList.add('d-none');
+                }
+            });
+        });
+    });
+    
+    // Handle create post buttons
     createPostButtons.forEach(button => {
         button.addEventListener('click', function() {
             const data = this.dataset;
@@ -205,18 +351,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Handle form submission with protection against double submissions
+    // Handle form submission
     const postForm = document.getElementById('postForm');
-    
-    // Remove any existing event listeners by cloning and replacing the form
-    const newPostForm = postForm.cloneNode(true);
-    postForm.parentNode.replaceChild(newPostForm, postForm);
-    
-    // Add event listener to the new form
-    newPostForm.addEventListener('submit', function(e) {
+    postForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // Multiple protection against double submission
         if (isSubmitting || formSubmitted) return;
         
         isSubmitting = true;
@@ -236,15 +375,11 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.set('spotify_preview_url', '');
         }
         
-        // Add a unique identifier to prevent caching
-        formData.append('_', Date.now().toString());
-        
         fetch(this.action, {
             method: 'POST',
             body: formData,
             headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
+                'X-Requested-With': 'XMLHttpRequest'
             }
         })
         .then(response => response.json())
@@ -255,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 toast.show();
                 createPostModal.hide();
                 
-                // Redirect instead of reload to prevent form resubmission
+                // Redirect to refresh the page
                 const currentUrl = new URL(window.location.href);
                 currentUrl.searchParams.set('_', Date.now().toString());
                 window.location.href = currentUrl.toString();
@@ -275,55 +410,86 @@ document.addEventListener('DOMContentLoaded', function() {
         .finally(() => {
             isSubmitting = false;
             submitButton.disabled = false;
-            submitButton.innerHTML = 'Post';
+            submitButton.innerHTML = 'Create Post';
         });
     });
     
-    // Cleanup form state when modal is hidden
-    document.getElementById('createPostModal').addEventListener('hidden.bs.modal', function() {
-        formSubmitted = false;
-        isSubmitting = false;
+    // Handle Listen Later buttons
+    document.querySelectorAll('.listen-later').forEach(button => {
+        button.addEventListener('click', function() {
+            const spotifyUri = this.dataset.spotifyUri;
+            
+            // Disable button and show loading state
+            this.disabled = true;
+            const originalContent = this.innerHTML;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+            
+            fetch('/social/add-to-listen-later/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `spotify_uri=${encodeURIComponent(spotifyUri)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('toastTitle').textContent = data.success ? 'Success' : 'Error';
+                document.getElementById('toastBody').textContent = data.message;
+                toast.show();
+            })
+            .catch(() => {
+                document.getElementById('toastTitle').textContent = 'Error';
+                document.getElementById('toastBody').textContent = 'Error adding to Listen Later';
+                toast.show();
+            })
+            .finally(() => {
+                // Restore button state
+                this.disabled = false;
+                this.innerHTML = originalContent;
+            });
+        });
+    });
+
+    // Handle Add to Queue buttons
+    document.querySelectorAll('.add-to-queue').forEach(button => {
+        button.addEventListener('click', function() {
+            const spotifyUri = this.dataset.spotifyUri;
+            
+            // Disable button and show loading state
+            this.disabled = true;
+            const originalContent = this.innerHTML;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+            
+            fetch('/social/add-to-queue/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `spotify_uri=${encodeURIComponent(spotifyUri)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('toastTitle').textContent = data.success ? 'Success' : 'Error';
+                document.getElementById('toastBody').textContent = data.message;
+                toast.show();
+            })
+            .catch(() => {
+                document.getElementById('toastTitle').textContent = 'Error';
+                document.getElementById('toastBody').textContent = 'Error adding to queue';
+                toast.show();
+            })
+            .finally(() => {
+                // Restore button state
+                this.disabled = false;
+                this.innerHTML = originalContent;
+            });
+        });
     });
 });
 </script>
-
-<style>
-.rating {
-    display: flex;
-    flex-direction: row-reverse;
-    justify-content: flex-end;
-}
-
-.rating input {
-    display: none;
-}
-
-.rating label {
-    font-size: 1.5rem;
-    color: #ddd;
-    cursor: pointer;
-    transition: color 0.2s;
-}
-
-.rating label:hover,
-.rating label:hover ~ label,
-.rating input:checked ~ label {
-    color: #ffc107;
-}
-
-.toast {
-    background-color: #fff;
-}
-
-.toast.bg-success .toast-header {
-    background-color: #d1e7dd;
-    color: #0f5132;
-}
-
-.toast.bg-danger .toast-header {
-    background-color: #f8d7da;
-    color: #842029;
-}
-</style>
 {% endblock %}
 {% endblock %} 

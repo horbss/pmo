@@ -214,6 +214,7 @@ def add_to_queue(request):
 @login_required
 @require_POST
 def add_to_listen_later(request):
+    """Add a track to the user's Listen Later playlist"""
     if not request.user.spotify_access_token:
         return JsonResponse({'success': False, 'message': 'Spotify account not connected'})
     
@@ -239,19 +240,58 @@ def add_to_listen_later(request):
         # Create Spotify instance with new token
         sp = spotipy.Spotify(auth=request.user.spotify_access_token)
         
-        # Add to playlist using the correct method
-        sp.playlist_add_items(
-            playlist_id=request.user.listen_later,
-            items=[spotify_uri]
-        )
+        # Verify the track exists
+        try:
+            track_info = sp.track(spotify_uri.split(':')[-1])
+            if not track_info:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid track'
+                })
+        except Exception as e:
+            logger.error(f"Error verifying track: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid track'
+            })
         
-        return JsonResponse({
-            'success': True,
-            'message': 'Track added to Listen Later playlist!'
-        })
+        # Check if track is already in playlist
+        try:
+            playlist_tracks = sp.playlist_items(request.user.listen_later)
+            for item in playlist_tracks['items']:
+                if item['track']['uri'] == spotify_uri:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Track is already in your Listen Later playlist'
+                    })
+        except Exception as e:
+            logger.error(f"Error checking playlist: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': 'Error checking playlist'
+            })
+        
+        # Add to playlist
+        try:
+            sp.playlist_add_items(
+                playlist_id=request.user.listen_later,
+                items=[spotify_uri]
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Track added to Listen Later playlist!'
+            })
+        except Exception as e:
+            logger.error(f"Error adding to playlist: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': 'Error adding to playlist'
+            })
+            
     except Exception as e:
-        logger.error(f"Error adding to listen later: {str(e)}")
+        logger.error(f"Error in add_to_listen_later: {str(e)}")
         return JsonResponse({
             'success': False,
-            'message': f'Error adding to Listen Later: {str(e)}'
+            'message': 'Error adding to Listen Later playlist'
         })
