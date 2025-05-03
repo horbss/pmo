@@ -21,6 +21,8 @@ class User(AbstractUser):
     top_album3_name = models.CharField(max_length=255, blank=True, null=True)
     top_album3_image = models.URLField(max_length=500, blank=True, null=True)
     
+    listen_later = models.CharField(max_length=255, blank=True, null=True)
+
     groups = models.ManyToManyField(
         'auth.Group',
         related_name='custom_user_set',

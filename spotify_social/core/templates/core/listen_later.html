@@ -1,0 +1,148 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Listen Later - Spotify Social{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="card-title">Listen Later Playlist</h2>
+                    
+                    {% if error %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                    {% else %}
+                        {% if tracks %}
+                            <div class="list-group">
+                                {% for track in tracks %}
+                                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <img src="{{ track.track.album.images.0.url }}" 
+                                                 alt="{{ track.track.name }}" 
+                                                 class="me-3"
+                                                 style="width: 40px; height: 40px;">
+                                            <div>
+                                                <strong>{{ track.track.name }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {% for artist in track.track.artists %}
+                                                        {{ artist.name }}{% if not forloop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <a href="{{ track.track.external_urls.spotify }}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-outline-primary me-2">
+                                                <i class="bi bi-spotify"></i> Open in Spotify
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-secondary add-to-queue me-2"
+                                                    data-spotify-uri="{{ track.track.uri }}">
+                                                <i class="bi bi-play-circle"></i> Add to Queue
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger remove-from-playlist"
+                                                    data-track-uri="{{ track.track.uri }}">
+                                                <i class="bi bi-trash"></i> Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Your listen later playlist is empty.</p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">Success</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastBody">
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toast = new bootstrap.Toast(document.getElementById('toast'));
+    
+    // Handle adding to queue
+    document.querySelectorAll('.add-to-queue').forEach(button => {
+        button.addEventListener('click', function() {
+            const spotifyUri = this.dataset.spotifyUri;
+            
+            fetch('{% url "social:add_to_queue" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `spotify_uri=${encodeURIComponent(spotifyUri)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('toastTitle').textContent = data.success ? 'Success' : 'Error';
+                document.getElementById('toastBody').textContent = data.message;
+                toast.show();
+            })
+            .catch(error => {
+                document.getElementById('toastTitle').textContent = 'Error';
+                document.getElementById('toastBody').textContent = 'An error occurred while adding to queue.';
+                toast.show();
+            });
+        });
+    });
+    
+    // Handle removing from playlist
+    document.querySelectorAll('.remove-from-playlist').forEach(button => {
+        button.addEventListener('click', function() {
+            const trackUri = this.dataset.trackUri;
+            
+            fetch('{% url "spotify:remove_from_playlist" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `track_uri=${encodeURIComponent(trackUri)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove the track element from the DOM
+                    this.closest('.list-group-item').remove();
+                    
+                    // If no tracks left, show empty message
+                    if (document.querySelectorAll('.list-group-item').length === 0) {
+                        document.querySelector('.list-group').innerHTML = '<p class="text-muted">Your listen later playlist is empty.</p>';
+                    }
+                }
+                
+                document.getElementById('toastTitle').textContent = data.success ? 'Success' : 'Error';
+                document.getElementById('toastBody').textContent = data.message;
+                toast.show();
+            })
+            .catch(error => {
+                document.getElementById('toastTitle').textContent = 'Error';
+                document.getElementById('toastBody').textContent = 'An error occurred while removing from playlist.';
+                toast.show();
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

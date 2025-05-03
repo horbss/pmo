@@ -140,18 +140,18 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">Rating (optional)</label>
-                        <div class="rating">
-                            {% for i in "12345"|make_list %}
-                                <input type="radio" name="rating" value="{{ i }}" id="star{{ i }}">
-                                <label for="star{{ i }}" class="bi bi-star"></label>
-                            {% endfor %}
-                        </div>
+                        <label for="postRating" class="form-label">Rating (1-10)</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="postRating" 
+                               name="rating" 
+                               min="1" 
+                               max="10" 
+                               step="0.1"
+                               required>
                     </div>
                     
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary" id="submitButton">Post</button>
-                    </div>
+                    <button type="submit" class="btn btn-primary">Create Post</button>
                 </form>
             </div>
         </div>
@@ -198,9 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Clear previous content and rating
             document.getElementById('postContent').value = '';
-            document.querySelectorAll('input[name="rating"]').forEach(radio => {
-                radio.checked = false;
-            });
+            document.getElementById('postRating').value = '';
             
             // Show the modal
             createPostModal.show();
@@ -224,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
         isSubmitting = true;
         formSubmitted = true;
         
-        const submitButton = document.getElementById('submitButton');
+        const submitButton = document.querySelector('button[type="submit"]');
         submitButton.disabled = true;
         submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Posting...';
         

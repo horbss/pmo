@@ -12,4 +12,5 @@ urlpatterns = [
     path('rate-track/', views.rate_track, name='rate_track'),
     path('get-token/', views.get_spotify_token, name='get_spotify_token'),
     path('get-top-albums/', views.get_top_albums, name='get_top_albums'),
+    path('remove-from-playlist/', views.remove_from_playlist, name='remove_from_playlist'),
 ] 

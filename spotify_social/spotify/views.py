@@ -11,6 +11,7 @@ from .models import TrackRating
 from social.models import Post
 import logging
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +78,20 @@ def spotify_callback(request):
                     username = f"{base_username}_{counter}"
                     counter += 1
                 
+                listen_later = sp.user_playlist_create(
+                    user=username,
+                    name="listen later",
+                    public=True,
+                    description="made for pmo"
+                )               
+                
                 user = User.objects.create_user(
                     username=username,
                     email=spotify_user['email'],
                     spotify_access_token=token_info['access_token'],
                     spotify_refresh_token=token_info.get('refresh_token'),
-                    spotify_id=spotify_user['id']  # Save the Spotify ID
+                    spotify_id=spotify_user['id'],
+                    listen_later = listen_later['id']
                 )
                 login(request, user)
                 messages.success(request, 'Account created successfully! You can update your username in your profile.')
@@ -411,3 +420,34 @@ def get_top_albums(request):
         return JsonResponse({'albums': albums})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+@require_POST
+def remove_from_playlist(request):
+    """Remove a track from the listen later playlist"""
+    if not request.user.spotify_access_token:
+        return JsonResponse({'success': False, 'message': 'Spotify account not connected'})
+    
+    track_uri = request.POST.get('track_uri')
+    if not track_uri:
+        return JsonResponse({'success': False, 'message': 'No track URI provided'})
+    
+    try:
+        sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+        
+        # Remove the track from the playlist
+        sp.playlist_remove_all_occurrences_of_items(
+            request.user.listen_later,
+            [track_uri]
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Track removed from playlist'
+        })
+    except Exception as e:
+        logger.error(f"Error removing track from playlist: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error removing track from playlist'
+        })

@@ -32,4 +32,5 @@ urlpatterns = [
     path('update-top-album/', update_top_album, name='update_top_album'),
     path('spotify/', include('spotify.urls')),
     path('social/', include('social.urls')),
+    path('listen-later/', core_views.listen_later, name='listen_later'),
 ]

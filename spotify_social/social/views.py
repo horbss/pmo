@@ -210,3 +210,48 @@ def add_to_queue(request):
     except Exception as e:
         logger.error(f"Error adding to queue: {str(e)}")
         return JsonResponse({'success': False, 'message': str(e)})
+
+@login_required
+@require_POST
+def add_to_listen_later(request):
+    if not request.user.spotify_access_token:
+        return JsonResponse({'success': False, 'message': 'Spotify account not connected'})
+    
+    spotify_uri = request.POST.get('spotify_uri')
+    if not spotify_uri:
+        return JsonResponse({'success': False, 'message': 'No track URI provided'})
+    
+    try:
+        # Create SpotifyOAuth instance with all required scopes
+        sp_oauth = SpotifyOAuth(
+            client_id=settings.SPOTIFY_CLIENT_ID,
+            client_secret=settings.SPOTIFY_CLIENT_SECRET,
+            redirect_uri=settings.SPOTIFY_REDIRECT_URI,
+            scope=settings.SPOTIFY_SCOPES
+        )
+        
+        # Try to refresh the token
+        token_info = sp_oauth.refresh_access_token(request.user.spotify_refresh_token)
+        if token_info:
+            request.user.spotify_access_token = token_info['access_token']
+            request.user.save()
+        
+        # Create Spotify instance with new token
+        sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+        
+        # Add to playlist using the correct method
+        sp.playlist_add_items(
+            playlist_id=request.user.listen_later,
+            items=[spotify_uri]
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Track added to Listen Later playlist!'
+        })
+    except Exception as e:
+        logger.error(f"Error adding to listen later: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error adding to Listen Later: {str(e)}'
+        })

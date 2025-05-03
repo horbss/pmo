@@ -297,9 +297,16 @@
                                     {% if post.post_type == 'track' %}
                                         <button class="btn btn-sm btn-outline-secondary add-to-queue"
                                                 data-spotify-uri="{{ post.get_spotify_uri }}">
-                                            <i class="bi bi-plus-circle"></i> Add to Queue
+                                            <i class="bi bi-play-circle"></i> Add to Queue
                                         </button>
                                     {% endif %}
+                                    {% if post.post_type == 'track' %}
+                                        <button class="btn btn-sm btn-outline-secondary listen-later"
+                                                data-spotify-uri="{{ post.get_spotify_uri }}">
+                                            <i class="bi bi-plus-circle"></i> Add to Listen Later
+                                        </button>
+                                    {% endif %}
+
                                 </div>
                             </div>
                         </div>
@@ -780,6 +787,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 opt.classList.add('d-none');
             });
         }
+    });
+
+    document.querySelectorAll('.add-to-queue').forEach(button => {
+        button.addEventListener('click', function() {
+            const spotifyUri = this.dataset.spotifyUri;
+            fetch('/social/add-to-queue/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `spotify_uri=${encodeURIComponent(spotifyUri)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Added to queue'); // Or use a toast for better UX
+            })
+            .catch(() => {
+                alert('Error adding to queue');
+            });
+        });
+    });
+    document.querySelectorAll('.listen-later').forEach(button => {
+        button.addEventListener('click', function() {
+            const spotifyUri = this.dataset.spotifyUri;
+            fetch('/social/add-to-listen-later/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `spotify_uri=${encodeURIComponent(spotifyUri)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Added to Listen Later'); // Or use a toast for better UX
+            })
+            .catch(() => {
+                alert('Error adding to Listen Later');
+            });
+        });
     });
 });
 </script>

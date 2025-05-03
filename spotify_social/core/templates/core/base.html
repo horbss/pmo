@@ -26,6 +26,11 @@
                             <a class="nav-link" href="{% url 'profile' %}">Profile</a>
                         </li>
                     {% endif %}
+                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'listen_later' %}">Listen Later</a>
+                        </li>
+                    {% endif %}
                 </ul>
                 <!-- Search Form -->
                 <form class="d-flex" action="{% url 'spotify:search_page' %}" method="get">

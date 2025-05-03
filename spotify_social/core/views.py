@@ -100,3 +100,26 @@ def update_top_album(request):
         return JsonResponse({'success': True})
         
     return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@login_required
+def listen_later(request):
+    """Display the user's listen later playlist"""
+    if not request.user.spotify_access_token:
+        messages.error(request, 'Please connect your Spotify account first.')
+        return redirect('profile')
+    
+    try:
+        sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+        
+        # Get the playlist tracks
+        playlist = sp.playlist(request.user.listen_later)
+        tracks = playlist['tracks']['items']
+        
+        return render(request, 'core/listen_later.html', {
+            'tracks': tracks
+        })
+    except Exception as e:
+        messages.error(request, 'Error fetching playlist data. Please try again.')
+        return render(request, 'core/listen_later.html', {
+            'error': str(e)
+        })
