@@ -9,7 +9,7 @@ class TrackRating(models.Model):
     track_id = models.CharField(max_length=100)
     track_name = models.CharField(max_length=255)
     artist_name = models.CharField(max_length=255)
-    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])
+    rating = models.DecimalField(max_digits=3, decimal_places=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -18,7 +18,7 @@ class TrackRating(models.Model):
         ordering = ['-updated_at']
 
     def __str__(self):
-        return f"{self.user.username} rated {self.track_name} - {self.artist_name} as {self.rating}/5"
+        return f"{self.user.username} rated {self.track_name} - {self.artist_name} as {self.rating}/10"
     
     @classmethod
     def get_average_rating(cls, track_id):
