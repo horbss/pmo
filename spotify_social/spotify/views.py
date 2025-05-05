@@ -79,7 +79,7 @@ def spotify_callback(request):
                     counter += 1
                 
                 listen_later = sp.user_playlist_create(
-                    user=username,
+                    user=spotify_user['id'],
                     name="listen later",
                     public=True,
                     description="made for pmo"
