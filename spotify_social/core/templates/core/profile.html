@@ -290,6 +290,14 @@
                                         <h5 class="mb-0">{{ post.user.username }}</h5>
                                         <small class="text-muted">{{ post.created_at|timesince }} ago</small>
                                     </div>
+                                    {% if post.user == request.user and request.user == user %}
+                                        <button class="btn btn-sm btn-outline-danger ms-auto delete-post" 
+                                                data-post-id="{{ post.id }}"
+                                                data-bs-toggle="tooltip"
+                                                title="Delete post">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    {% endif %}
                                 </div>
                                 
                                 <div class="d-flex align-items-center mb-3">
@@ -332,7 +340,6 @@
                                             <i class="bi bi-plus-circle"></i> Listen Later
                                         </button>
                                     {% endif %}
-
                                 </div>
                             </div>
                         </div>
@@ -949,6 +956,47 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Focus the content textarea
             document.getElementById('content').focus();
+        });
+    });
+
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Handle post deletion
+    document.querySelectorAll('.delete-post').forEach(button => {
+        button.addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete this post?')) {
+                const postId = this.dataset.postId;
+                const postCard = this.closest('.card');
+                
+                fetch(`/social/delete-post/${postId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        postCard.remove();
+                        // If no posts left, show the "No posts yet" message
+                        if (document.querySelectorAll('.card').length === 0) {
+                            const postsContainer = document.querySelector('.card-body');
+                            postsContainer.innerHTML = '<p class="text-muted">No posts yet.</p>';
+                        }
+                    } else {
+                        alert('Error deleting post: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting post. Please try again.');
+                });
+            }
         });
     });
 });

@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Post
@@ -294,4 +294,31 @@ def add_to_listen_later(request):
         return JsonResponse({
             'success': False,
             'message': 'Error adding to Listen Later playlist'
+        })
+
+@login_required
+@require_POST
+def delete_post(request, post_id):
+    """Delete a post"""
+    try:
+        post = get_object_or_404(Post, id=post_id)
+        
+        # Check if the user owns the post
+        if post.user != request.user:
+            return JsonResponse({
+                'success': False,
+                'message': 'You can only delete your own posts.'
+            })
+        
+        post.delete()
+        return JsonResponse({
+            'success': True,
+            'message': 'Post deleted successfully.'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting post: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error deleting post: {str(e)}'
         })
