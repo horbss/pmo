@@ -70,6 +70,10 @@ def profile(request):
     # Get user's posts
     posts = Post.objects.filter(user=request.user).order_by('-created_at')
     
+    # Add liked status for each post
+    for post in posts:
+        post.user_has_liked = post.is_liked_by(request.user)
+    
     return render(request, 'core/profile.html', {
         'spotify_data': spotify_data,
         'currently_playing': currently_playing,

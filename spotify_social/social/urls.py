@@ -10,6 +10,11 @@ urlpatterns = [
     path('add-to-listen-later/', views.add_to_listen_later, name='add_to_listen_later'),
     path('delete-post/<int:post_id>/', views.delete_post, name='delete_post'),
     
+    # Like and Comment URLs
+    path('like-post/<int:post_id>/', views.like_post, name='like_post'),
+    path('add-comment/<int:post_id>/', views.add_comment, name='add_comment'),
+    path('get-comments/<int:post_id>/', views.get_comments, name='get_comments'),
+    
     # Follow system URLs
     path('discover/', views.discover_users, name='discover_users'),
     path('feed/', views.feed, name='feed'),

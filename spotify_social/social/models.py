@@ -36,6 +36,58 @@ class Post(models.Model):
         elif self.post_type == 'album':
             return f"spotify:album:{self.spotify_id}"
         return None
+    
+    def get_like_count(self):
+        """Get the number of likes for this post"""
+        return self.likes.count()
+    
+    def get_comment_count(self):
+        """Get the number of comments for this post"""
+        return self.comments.count()
+    
+    def is_liked_by(self, user):
+        """Check if a user has liked this post"""
+        if user.is_authenticated:
+            return self.likes.filter(user=user).exists()
+        return False
+
+
+class Like(models.Model):
+    """Model to track post likes"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, related_name='likes', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        unique_together = ('user', 'post')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.username} likes {self.post.spotify_name}"
+
+
+class Comment(models.Model):
+    """Model to track post comments with threading support"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, related_name='comments', on_delete=models.CASCADE)
+    content = models.TextField()
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='replies', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"{self.user.username}: {self.content[:50]}..."
+    
+    def get_reply_count(self):
+        """Get the number of replies to this comment"""
+        return self.replies.count()
+    
+    def is_reply(self):
+        """Check if this comment is a reply to another comment"""
+        return self.parent is not None
 
 
 class Follow(models.Model):

@@ -386,6 +386,64 @@
                                     </div>
                                 {% endif %}
                                 
+                                <!-- Social Actions -->
+                                <div class="mt-3 border-top pt-3">
+                                    <!-- Like and Comment Counts -->
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="text-muted small">
+                                            <span class="like-count" data-post-id="{{ post.id }}">{{ post.get_like_count }}</span> likes
+                                            <span class="ms-2 comment-count" data-post-id="{{ post.id }}">{{ post.get_comment_count }}</span> comments
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Action Buttons -->
+                                    <div class="d-flex justify-content-between border-top border-bottom py-2 mb-3">
+                                        <button class="btn btn-sm btn-link text-decoration-none like-btn" 
+                                                data-post-id="{{ post.id }}"
+                                                data-liked="{{ post.user_has_liked }}">
+                                            <i class="bi bi-heart{% if post.user_has_liked %}-fill text-danger{% endif %}"></i>
+                                            <span>Like</span>
+                                        </button>
+                                        
+                                        <button class="btn btn-sm btn-link text-decoration-none comment-btn" 
+                                                data-post-id="{{ post.id }}">
+                                            <i class="bi bi-chat"></i>
+                                            <span>Comment</span>
+                                        </button>
+                                        
+                                        <button class="btn btn-sm btn-link text-decoration-none show-comments-btn" 
+                                                data-post-id="{{ post.id }}">
+                                            <i class="bi bi-eye"></i>
+                                            <span>View Comments</span>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Comment Form (initially hidden) -->
+                                    <div class="comment-form" data-post-id="{{ post.id }}" style="display: none;">
+                                        <form class="add-comment-form" data-post-id="{{ post.id }}">
+                                            {% csrf_token %}
+                                            <div class="input-group mb-3">
+                                                <input type="text" 
+                                                       class="form-control comment-input" 
+                                                       placeholder="Write a comment..."
+                                                       name="content"
+                                                       required>
+                                                <button class="btn btn-primary" type="submit">
+                                                    <i class="bi bi-send"></i>
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    
+                                    <!-- Comments Section (initially hidden) -->
+                                    <div class="comments-section" data-post-id="{{ post.id }}" style="display: none;">
+                                        <div class="comments-list" data-post-id="{{ post.id }}">
+                                            <!-- Comments will be loaded here -->
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Spotify Actions -->
                                 <div class="mt-3 d-flex align-items-center">
                                     <a href="{{ post.spotify_url }}" 
                                        target="_blank" 
@@ -1442,6 +1500,260 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    // Like functionality
+    document.querySelectorAll('.like-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            const heartIcon = this.querySelector('i');
+            const likeCountElement = document.querySelector(`.like-count[data-post-id="${postId}"]`);
+            
+            fetch(`/social/like-post/${postId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update like count
+                    likeCountElement.textContent = data.like_count;
+                    
+                    // Update button appearance
+                    if (data.liked) {
+                        heartIcon.className = 'bi bi-heart-fill text-danger';
+                        this.dataset.liked = 'true';
+                    } else {
+                        heartIcon.className = 'bi bi-heart';
+                        this.dataset.liked = 'false';
+                    }
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating like status');
+            });
+        });
+    });
+
+    // Comment button functionality (show/hide comment form)
+    document.querySelectorAll('.comment-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            const commentForm = document.querySelector(`.comment-form[data-post-id="${postId}"]`);
+            
+            if (commentForm.style.display === 'none') {
+                commentForm.style.display = 'block';
+                commentForm.querySelector('input').focus();
+            } else {
+                commentForm.style.display = 'none';
+            }
+        });
+    });
+
+    // Show comments functionality
+    document.querySelectorAll('.show-comments-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            const commentsSection = document.querySelector(`.comments-section[data-post-id="${postId}"]`);
+            const commentsList = document.querySelector(`.comments-list[data-post-id="${postId}"]`);
+            
+            if (commentsSection.style.display === 'none') {
+                // Show comments and load them
+                commentsSection.style.display = 'block';
+                this.querySelector('span').textContent = 'Hide Comments';
+                loadComments(postId, commentsList);
+            } else {
+                // Hide comments
+                commentsSection.style.display = 'none';
+                this.querySelector('span').textContent = 'View Comments';
+            }
+        });
+    });
+
+    // Add comment form submission
+    document.querySelectorAll('.add-comment-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const postId = this.dataset.postId;
+            const formData = new FormData(this);
+            const commentInput = this.querySelector('.comment-input');
+            const commentCountElement = document.querySelector(`.comment-count[data-post-id="${postId}"]`);
+            const commentsList = document.querySelector(`.comments-list[data-post-id="${postId}"]`);
+            
+            fetch(`/social/add-comment/${postId}/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Clear the input
+                    commentInput.value = '';
+                    
+                    // Update comment count
+                    commentCountElement.textContent = data.comment_count;
+                    
+                    // Show success message
+                    alert('Comment added successfully!');
+                    
+                    // Reload comments if they're visible
+                    const commentsSection = document.querySelector(`.comments-section[data-post-id="${postId}"]`);
+                    if (commentsSection.style.display !== 'none') {
+                        loadComments(postId, commentsList);
+                    }
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error adding comment');
+            });
+        });
+    });
+
+    // Function to load comments
+    function loadComments(postId, container) {
+        fetch(`/social/get-comments/${postId}/`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                container.innerHTML = '';
+                
+                if (data.comments.length === 0) {
+                    container.innerHTML = '<p class="text-muted small">No comments yet.</p>';
+                } else {
+                    data.comments.forEach(comment => {
+                        const commentElement = createCommentElement(comment, postId);
+                        container.appendChild(commentElement);
+                    });
+                }
+            } else {
+                container.innerHTML = '<p class="text-danger small">Error loading comments.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            container.innerHTML = '<p class="text-danger small">Error loading comments.</p>';
+        });
+    }
+
+    // Function to create comment element
+    function createCommentElement(comment, postId) {
+        const div = document.createElement('div');
+        div.className = 'comment mb-2 p-2 bg-light rounded';
+        
+        let repliesHtml = '';
+        if (comment.replies && comment.replies.length > 0) {
+            repliesHtml = '<div class="replies ms-3 mt-2">';
+            comment.replies.forEach(reply => {
+                repliesHtml += `
+                    <div class="reply mb-1 p-1 bg-white rounded border-start border-primary border-2">
+                        <div class="d-flex justify-content-between">
+                            <strong class="small">${reply.user}</strong>
+                            <small class="text-muted">${reply.created_at}</small>
+                        </div>
+                        <p class="mb-0 small">${reply.content}</p>
+                    </div>
+                `;
+            });
+            repliesHtml += '</div>';
+        }
+        
+        div.innerHTML = `
+            <div class="d-flex justify-content-between">
+                <strong class="small">${comment.user}</strong>
+                <small class="text-muted">${comment.created_at}</small>
+            </div>
+            <p class="mb-1">${comment.content}</p>
+            <div class="d-flex gap-2">
+                <button class="btn btn-link btn-sm p-0 text-decoration-none reply-btn" 
+                        data-comment-id="${comment.id}" 
+                        data-post-id="${postId}">
+                    Reply
+                </button>
+            </div>
+            ${repliesHtml}
+            <div class="reply-form mt-2" data-comment-id="${comment.id}" style="display: none;">
+                <form class="add-reply-form" data-comment-id="${comment.id}" data-post-id="${postId}">
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" placeholder="Write a reply..." name="content" required>
+                        <button class="btn btn-primary" type="submit">Reply</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        
+        // Add reply button functionality
+        const replyBtn = div.querySelector('.reply-btn');
+        const replyForm = div.querySelector('.reply-form');
+        
+        replyBtn.addEventListener('click', function() {
+            if (replyForm.style.display === 'none') {
+                replyForm.style.display = 'block';
+                replyForm.querySelector('input').focus();
+            } else {
+                replyForm.style.display = 'none';
+            }
+        });
+        
+        // Add reply form submission
+        const addReplyForm = div.querySelector('.add-reply-form');
+        addReplyForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            formData.append('parent_id', comment.id);
+            
+            fetch(`/social/add-comment/${postId}/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Clear the input
+                    this.querySelector('input').value = '';
+                    replyForm.style.display = 'none';
+                    
+                    // Update comment count
+                    const commentCountElement = document.querySelector(`.comment-count[data-post-id="${postId}"]`);
+                    commentCountElement.textContent = data.comment_count;
+                    
+                    // Reload comments
+                    const commentsList = document.querySelector(`.comments-list[data-post-id="${postId}"]`);
+                    loadComments(postId, commentsList);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error adding reply');
+            });
+        });
+        
+        return div;
+    }
 });
 </script>
 {% endblock %} 

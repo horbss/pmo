@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Post, Follow
+from .models import Post, Follow, Like, Comment
 from core.models import User
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -536,6 +536,10 @@ def feed(request):
     else:
         feed_posts = Post.objects.none()
     
+    # Add liked status for each post
+    for post in feed_posts:
+        post.user_has_liked = post.is_liked_by(request.user)
+    
     return render(request, 'social/feed.html', {
         'posts': feed_posts
     })
@@ -597,6 +601,10 @@ def user_profile(request, user_id):
         # Only show public posts for other users
         posts = Post.objects.filter(user=profile_user, is_private=False).order_by('-created_at')
     
+    # Add liked status for each post
+    for post in posts:
+        post.user_has_liked = post.is_liked_by(request.user)
+    
     # Check if current user is following this profile user
     is_following = request.user.is_following(profile_user)
     
@@ -633,3 +641,145 @@ def user_profile(request, user_id):
         'is_following': is_following,
         'spotify_data': spotify_data
     })
+
+@login_required
+@require_POST
+def like_post(request, post_id):
+    """Toggle like on a post"""
+    try:
+        post = get_object_or_404(Post, id=post_id)
+        
+        # Check if user already liked the post
+        like, created = Like.objects.get_or_create(
+            user=request.user,
+            post=post
+        )
+        
+        if not created:
+            # User already liked it, so unlike it
+            like.delete()
+            liked = False
+            message = 'Post unliked'
+        else:
+            # New like
+            liked = True
+            message = 'Post liked'
+        
+        return JsonResponse({
+            'success': True,
+            'liked': liked,
+            'like_count': post.get_like_count(),
+            'message': message
+        })
+        
+    except Exception as e:
+        logger.error(f"Error toggling like: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error updating like status'
+        })
+
+@login_required
+@require_POST
+def add_comment(request, post_id):
+    """Add a comment to a post"""
+    try:
+        post = get_object_or_404(Post, id=post_id)
+        content = request.POST.get('content', '').strip()
+        parent_id = request.POST.get('parent_id')
+        
+        if not content:
+            return JsonResponse({
+                'success': False,
+                'message': 'Comment content cannot be empty'
+            })
+        
+        # Get parent comment if this is a reply
+        parent = None
+        if parent_id:
+            try:
+                parent = Comment.objects.get(id=parent_id, post=post)
+            except Comment.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Parent comment not found'
+                })
+        
+        # Create the comment
+        comment = Comment.objects.create(
+            user=request.user,
+            post=post,
+            content=content,
+            parent=parent
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Comment added successfully',
+            'comment': {
+                'id': comment.id,
+                'content': comment.content,
+                'user': comment.user.username,
+                'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
+                'is_reply': comment.is_reply(),
+                'parent_id': comment.parent.id if comment.parent else None
+            },
+            'comment_count': post.get_comment_count()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding comment: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error adding comment'
+        })
+
+@login_required
+def get_comments(request, post_id):
+    """Get comments for a post"""
+    try:
+        post = get_object_or_404(Post, id=post_id)
+        
+        # Get all comments for the post (top-level comments and replies)
+        comments = Comment.objects.filter(post=post).select_related('user', 'parent')
+        
+        # Organize comments into a tree structure
+        comment_tree = []
+        comment_dict = {}
+        
+        # First pass: create all comment objects
+        for comment in comments:
+            comment_data = {
+                'id': comment.id,
+                'content': comment.content,
+                'user': comment.user.username,
+                'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
+                'is_reply': comment.is_reply(),
+                'parent_id': comment.parent.id if comment.parent else None,
+                'replies': []
+            }
+            comment_dict[comment.id] = comment_data
+        
+        # Second pass: organize into tree structure
+        for comment in comments:
+            comment_data = comment_dict[comment.id]
+            if comment.parent:
+                # This is a reply, add it to parent's replies
+                if comment.parent.id in comment_dict:
+                    comment_dict[comment.parent.id]['replies'].append(comment_data)
+            else:
+                # This is a top-level comment
+                comment_tree.append(comment_data)
+        
+        return JsonResponse({
+            'success': True,
+            'comments': comment_tree,
+            'comment_count': post.get_comment_count()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching comments: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error fetching comments'
+        })
