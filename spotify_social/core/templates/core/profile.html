@@ -17,6 +17,16 @@
                     </div>
                     <p class="card-text">{{ user.email }}</p>
                     
+                    <!-- Follow Stats -->
+                    <div class="d-flex gap-3 mb-3">
+                        <a href="{% url 'social:followers_list' %}" class="text-decoration-none">
+                            <strong>{{ user.get_follower_count }}</strong> followers
+                        </a>
+                        <a href="{% url 'social:following_list' %}" class="text-decoration-none">
+                            <strong>{{ user.get_following_count }}</strong> following
+                        </a>
+                    </div>
+                    
                     {% if user.spotify_access_token %}
                         {% if spotify_data %}
                             <div class="d-flex align-items-center mb-3">

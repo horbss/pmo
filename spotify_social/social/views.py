@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Post
+from .models import Post, Follow
+from core.models import User
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from django.conf import settings
@@ -10,6 +11,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 import re
 from django.utils import timezone
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -322,3 +324,195 @@ def delete_post(request, post_id):
             'success': False,
             'message': f'Error deleting post: {str(e)}'
         })
+
+# Follow System Views
+
+@login_required
+def discover_users(request):
+    """Discover users to follow"""
+    # Get users that the current user is not following and exclude themselves
+    following_ids = request.user.following.values_list('following_id', flat=True)
+    
+    # Search functionality
+    search_query = request.GET.get('search', '').strip()
+    
+    if search_query:
+        # When searching, show ALL users (except self) that match the search
+        users_to_discover = User.objects.exclude(id=request.user.id).filter(
+            Q(username__icontains=search_query) | 
+            Q(first_name__icontains=search_query) | 
+            Q(last_name__icontains=search_query)
+        ).order_by('username')
+    else:
+        # When not searching, show users not currently following (and have Spotify connected)
+        users_to_discover = User.objects.exclude(
+            Q(id=request.user.id) | Q(id__in=following_ids)
+        ).filter(spotify_access_token__isnull=False).order_by('username')
+    
+    # Add a flag to indicate if each user is already being followed
+    for user in users_to_discover:
+        user.is_already_following = request.user.is_following(user)
+    
+    return render(request, 'social/discover_users.html', {
+        'users': users_to_discover,
+        'search_query': search_query
+    })
+
+@login_required
+@require_POST 
+def follow_user(request, user_id):
+    """Follow a user"""
+    try:
+        user_to_follow = get_object_or_404(User, id=user_id)
+        
+        # Can't follow yourself
+        if user_to_follow == request.user:
+            return JsonResponse({
+                'success': False,
+                'message': 'You cannot follow yourself.'
+            })
+        
+        # Check if already following
+        if request.user.is_following(user_to_follow):
+            return JsonResponse({
+                'success': False,
+                'message': f'You are already following {user_to_follow.username}.'
+            })
+        
+        # Create follow relationship
+        Follow.objects.create(
+            follower=request.user,
+            following=user_to_follow
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'You are now following {user_to_follow.username}!'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error following user: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error following user.'
+        })
+
+@login_required
+@require_POST
+def unfollow_user(request, user_id):
+    """Unfollow a user"""
+    try:
+        user_to_unfollow = get_object_or_404(User, id=user_id)
+        
+        # Check if following
+        follow_relation = Follow.objects.filter(
+            follower=request.user,
+            following=user_to_unfollow
+        ).first()
+        
+        if not follow_relation:
+            return JsonResponse({
+                'success': False,
+                'message': f'You are not following {user_to_unfollow.username}.'
+            })
+        
+        # Delete follow relationship
+        follow_relation.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'You have unfollowed {user_to_unfollow.username}.'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error unfollowing user: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': 'Error unfollowing user.'
+        })
+
+@login_required
+def feed(request):
+    """Display posts from users you follow"""
+    # Get users the current user is following
+    following_users = request.user.get_following_users()
+    
+    # Get posts from followed users
+    if following_users.exists():
+        feed_posts = Post.objects.filter(user__in=following_users).order_by('-created_at')
+    else:
+        feed_posts = Post.objects.none()
+    
+    return render(request, 'social/feed.html', {
+        'posts': feed_posts
+    })
+
+@login_required
+def following_list(request, user_id=None):
+    """Display list of users that a user is following"""
+    if user_id:
+        profile_user = get_object_or_404(User, id=user_id)
+    else:
+        profile_user = request.user
+    
+    following_users = profile_user.get_following_users()
+    
+    # Add follow status for each following user
+    for user in following_users:
+        user.is_followed_by_current_user = request.user.is_following(user)
+    
+    return render(request, 'social/following_list.html', {
+        'profile_user': profile_user,
+        'following_users': following_users,
+        'is_own_profile': profile_user == request.user
+    })
+
+@login_required
+def followers_list(request, user_id=None):
+    """Display list of followers for a user"""
+    if user_id:
+        profile_user = get_object_or_404(User, id=user_id)
+    else:
+        profile_user = request.user
+    
+    followers_users = profile_user.get_followers_users()
+    
+    # Add follow status for each follower
+    for user in followers_users:
+        user.is_followed_by_current_user = request.user.is_following(user)
+    
+    return render(request, 'social/followers_list.html', {
+        'profile_user': profile_user,
+        'followers_users': followers_users,
+        'is_own_profile': profile_user == request.user
+    })
+
+@login_required
+def user_profile(request, user_id):
+    """Display another user's profile"""
+    profile_user = get_object_or_404(User, id=user_id)
+    
+    # Don't show profile for yourself - redirect to main profile
+    if profile_user == request.user:
+        return redirect('profile')
+    
+    # Get user's posts
+    posts = Post.objects.filter(user=profile_user).order_by('-created_at')
+    
+    # Check if current user is following this profile user
+    is_following = request.user.is_following(profile_user)
+    
+    spotify_data = None
+    if profile_user.spotify_access_token:
+        try:
+            sp = spotipy.Spotify(auth=profile_user.spotify_access_token)
+            spotify_data = sp.current_user()
+        except Exception as e:
+            logger.error(f"Error fetching Spotify data for user {profile_user.username}: {str(e)}")
+    
+    return render(request, 'social/user_profile.html', {
+        'profile_user': profile_user,
+        'posts': posts,
+        'is_following': is_following,
+        'spotify_data': spotify_data
+    })

@@ -77,5 +77,25 @@ class User(AbstractUser):
             artists.append(artist)
         return artists
 
+    def get_follower_count(self):
+        """Return the number of followers"""
+        return self.followers.count()
+
+    def get_following_count(self):
+        """Return the number of users this user is following"""
+        return self.following.count()
+
+    def is_following(self, user):
+        """Check if this user is following another user"""
+        return self.following.filter(following=user).exists()
+
+    def get_following_users(self):
+        """Get all users this user is following"""
+        return User.objects.filter(followers__follower=self)
+
+    def get_followers_users(self):
+        """Get all users following this user"""
+        return User.objects.filter(following__following=self)
+
     def __str__(self):
         return self.username

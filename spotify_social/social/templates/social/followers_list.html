@@ -1,0 +1,142 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Followers - {{ profile_user.username }} - Spotify Social{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-4">
+                        <a href="{% if is_own_profile %}{% url 'profile' %}{% else %}{% url 'social:user_profile' profile_user.id %}{% endif %}" 
+                           class="btn btn-outline-secondary me-3">
+                            <i class="bi bi-arrow-left"></i> Back
+                        </a>
+                        <div>
+                            <h2 class="card-title mb-0">Followers</h2>
+                            <p class="text-muted mb-0">Users following {{ profile_user.username }}</p>
+                        </div>
+                    </div>
+                    
+                    {% if followers_users %}
+                        <div class="row">
+                            {% for user in followers_users %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <h5 class="card-title mb-1">
+                                                        <a href="{% url 'social:user_profile' user.id %}" class="text-decoration-none">
+                                                            {{ user.username }}
+                                                        </a>
+                                                    </h5>
+                                                    <p class="card-text text-muted mb-2">
+                                                        <small>{{ user.get_follower_count }} followers • {{ user.get_following_count }} following</small>
+                                                    </p>
+                                                    {% if user.first_name or user.last_name %}
+                                                        <p class="card-text mb-2">{{ user.first_name }} {{ user.last_name }}</p>
+                                                    {% endif %}
+                                                </div>
+                                                
+                                                <!-- Show follow button if user is not yourself -->
+                                                {% if user != request.user %}
+                                                    {% if user.is_followed_by_current_user %}
+                                                        <button class="btn btn-outline-danger btn-sm follow-btn" 
+                                                                data-user-id="{{ user.id }}"
+                                                                data-action="unfollow">
+                                                            <i class="bi bi-person-dash"></i> Unfollow
+                                                        </button>
+                                                    {% else %}
+                                                        <button class="btn btn-primary btn-sm follow-btn" 
+                                                                data-user-id="{{ user.id }}"
+                                                                data-action="follow">
+                                                            <i class="bi bi-person-plus"></i> Follow
+                                                        </button>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-people" style="font-size: 3rem;"></i>
+                            <h4 class="mt-3">No followers yet</h4>
+                            {% if is_own_profile %}
+                                <p>You don't have any followers yet.</p>
+                                <p>Start posting and following others to build your network!</p>
+                            {% else %}
+                                <p>{{ profile_user.username }} doesn't have any followers yet.</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Follow/Unfollow functionality for followers list
+document.querySelectorAll('.follow-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const userId = this.dataset.userId;
+        const action = this.dataset.action;
+        const url = action === 'follow' ? 
+            `{% url 'social:follow_user' 0 %}`.replace('0', userId) : 
+            `{% url 'social:unfollow_user' 0 %}`.replace('0', userId);
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (action === 'follow') {
+                    this.innerHTML = '<i class="bi bi-person-dash"></i> Unfollow';
+                    this.classList.remove('btn-primary');
+                    this.classList.add('btn-outline-danger');
+                    this.dataset.action = 'unfollow';
+                } else {
+                    this.innerHTML = '<i class="bi bi-person-plus"></i> Follow';
+                    this.classList.remove('btn-outline-danger');
+                    this.classList.add('btn-primary');
+                    this.dataset.action = 'follow';
+                }
+                
+                // Show success message
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-success alert-dismissible fade show mt-3';
+                alert.innerHTML = `
+                    ${data.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                this.closest('.card-body').appendChild(alert);
+                
+                // Auto-dismiss alert after 3 seconds
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 3000);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating follow status');
+        });
+    });
+});
+</script>
+{% endblock %} 

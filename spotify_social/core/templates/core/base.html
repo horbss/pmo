@@ -25,8 +25,16 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'profile' %}">Profile</a>
                         </li>
-                    {% endif %}
-                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'social:feed' %}">
+                                <i class="bi bi-rss"></i> Feed
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'social:discover_users' %}">
+                                <i class="bi bi-people"></i> Discover
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'listen_later' %}">Listen Later</a>
                         </li>

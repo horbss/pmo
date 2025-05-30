@@ -1,0 +1,154 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Feed - Spotify Social{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title">Your Feed</h2>
+                    <p class="text-muted">Posts from users you follow</p>
+                    
+                    {% if posts %}
+                        {% for post in posts %}
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <!-- User Info Header -->
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="me-3">
+                                            <a href="{% url 'social:user_profile' post.user.id %}" class="text-decoration-none">
+                                                <strong>{{ post.user.username }}</strong>
+                                            </a>
+                                            <small class="text-muted d-block">{{ post.created_at|timesince }} ago</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Post Content -->
+                                    {% if post.content %}
+                                        <p class="card-text">{{ post.content }}</p>
+                                    {% endif %}
+                                    
+                                    <!-- Spotify Content -->
+                                    <div class="row align-items-center">
+                                        <div class="col-auto">
+                                            {% if post.spotify_image_url %}
+                                                <img src="{{ post.spotify_image_url }}" 
+                                                     alt="{{ post.spotify_name }}" 
+                                                     class="img-thumbnail"
+                                                     style="width: 80px; height: 80px; object-fit: cover;">
+                                            {% endif %}
+                                        </div>
+                                        <div class="col">
+                                            <h6 class="mb-1">{{ post.spotify_name }}</h6>
+                                            <p class="mb-1 text-muted">{{ post.spotify_artist }}</p>
+                                            {% if post.post_type == 'rating' and post.rating %}
+                                                <p class="mb-1">
+                                                    <span class="badge bg-warning text-dark">{{ post.rating }}/10</span>
+                                                </p>
+                                            {% endif %}
+                                            <small class="text-muted">{{ post.get_post_type_display }}</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Actions -->
+                                    <div class="mt-3 d-flex align-items-center">
+                                        <a href="{{ post.spotify_url }}" 
+                                           target="_blank" 
+                                           class="btn btn-sm btn-outline-primary me-2">
+                                            <i class="bi bi-spotify"></i> {% if post.post_type == 'track' %}Open{% else %}View Tracks{% endif %}
+                                        </a>
+                                        
+                                        {% if post.post_type == 'track' %}
+                                            <button class="btn btn-sm btn-outline-secondary add-to-queue me-2"
+                                                    data-spotify-uri="{{ post.get_spotify_uri }}">
+                                                <i class="bi bi-play-circle"></i> Queue
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary listen-later"
+                                                    data-spotify-uri="{{ post.get_spotify_uri }}">
+                                                <i class="bi bi-plus-circle"></i> Listen Later
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-rss" style="font-size: 3rem;"></i>
+                            <h4 class="mt-3">Your feed is empty</h4>
+                            <p>Follow some users to see their posts here!</p>
+                            <a href="{% url 'social:discover_users' %}" class="btn btn-primary">
+                                <i class="bi bi-person-plus"></i> Discover Users
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add to queue functionality
+document.querySelectorAll('.add-to-queue').forEach(button => {
+    button.addEventListener('click', function() {
+        const spotifyUri = this.dataset.spotifyUri;
+        fetch('{% url "social:add_to_queue" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: `spotify_uri=${encodeURIComponent(spotifyUri)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.innerHTML = '<i class="bi bi-check"></i> Queued';
+                this.classList.remove('btn-outline-secondary');
+                this.classList.add('btn-success');
+                this.disabled = true;
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(() => {
+            alert('Error adding to queue');
+        });
+    });
+});
+
+// Listen later functionality
+document.querySelectorAll('.listen-later').forEach(button => {
+    button.addEventListener('click', function() {
+        const spotifyUri = this.dataset.spotifyUri;
+        fetch('{% url "social:add_to_listen_later" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: `spotify_uri=${encodeURIComponent(spotifyUri)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.innerHTML = '<i class="bi bi-check"></i> Added';
+                this.classList.remove('btn-outline-secondary');
+                this.classList.add('btn-success');
+                this.disabled = true;
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(() => {
+            alert('Error adding to Listen Later');
+        });
+    });
+});
+</script>
+{% endblock %} 
