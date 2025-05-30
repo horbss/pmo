@@ -137,26 +137,50 @@
                 
                 <div class="card mb-4">
                     <div class="card-body">
-                        <h3 class="card-title">Top Artists</h3>
-                        <div class="row">
-                            {% for artist in top_artists.items %}
+                        <h3 class="card-title">Top 3 Artists</h3>
+                        <div class="d-flex justify-content-between mb-3">
+                            <button class="btn btn-outline-primary" id="toggleArtistView">Switch to Spotify's Top 3</button>
+                        </div>
+                        
+                        <div class="row" id="userTopArtists">
+                            {% for artist in user.get_top_artists %}
                                 <div class="col-md-4 mb-3">
-                                    <div class="card">
-                                        {% if artist.images %}
-                                            <img src="{{ artist.images.0.url }}" 
-                                                 class="card-img-top" 
-                                                 alt="{{ artist.name }}"
-                                                 style="height: 200px; object-fit: cover;">
+                                    <div class="card artist-card position-relative" data-position="{{ artist.position }}">
+                                        {% if artist.id %}
+                                            <button class="btn btn-sm btn-outline-secondary edit-toggle position-absolute top-0 end-0 m-2"
+                                                    data-position="{{ artist.position }}">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+                                            <div class="edit-options position-absolute top-0 end-0 m-2 d-none">
+                                                <div class="btn-group">
+                                                    <button class="btn btn-sm btn-outline-primary edit-artist" 
+                                                            data-position="{{ artist.position }}">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger delete-artist"
+                                                            data-position="{{ artist.position }}">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <img src="{{ artist.image }}" class="card-img-top" alt="Artist image" style="height: 200px; object-fit: cover;">
+                                            <div class="card-body">
+                                                <h6 class="card-title">{{ artist.name }}</h6>
+                                            </div>
+                                        {% else %}
+                                            <div class="card-body text-center" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                                                <button class="btn btn-outline-secondary select-artist" data-position="{{ artist.position }}">
+                                                    Select Artist {{ artist.position }}
+                                                </button>
+                                            </div>
                                         {% endif %}
-                                        <div class="card-body">
-                                            <h5 class="card-title">{{ artist.name }}</h5>
-                                            <p class="card-text small text-muted">
-                                                {{ artist.followers.total }} followers
-                                            </p>
-                                        </div>
                                     </div>
                                 </div>
                             {% endfor %}
+                        </div>
+                        
+                        <div class="row d-none" id="spotifyTopArtists">
+                            <!-- Spotify's top artists will be loaded here -->
                         </div>
                     </div>
                 </div>
@@ -373,6 +397,27 @@
     </div>
 </div>
 
+<!-- Artist Search Modal -->
+<div class="modal fade" id="artistSearchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Search Artists</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="artistSearchInput" placeholder="Search for an artist...">
+                    <button class="btn btn-outline-secondary" type="button" id="searchArtists">Search</button>
+                </div>
+                <div id="artistSearchResults" class="list-group">
+                    <!-- Search results will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -513,6 +558,144 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 spotifyTopAlbums.innerHTML = '';
                 spotifyTopAlbums.appendChild(container);
+            });
+    }
+
+    // Top Artists functionality
+    const artistModal = new bootstrap.Modal(document.getElementById('artistSearchModal'));
+    const artistSearchInput = document.getElementById('artistSearchInput');
+    const artistSearchButton = document.getElementById('searchArtists');
+    const artistSearchResults = document.getElementById('artistSearchResults');
+    const toggleArtistView = document.getElementById('toggleArtistView');
+    const userTopArtists = document.getElementById('userTopArtists');
+    const spotifyTopArtists = document.getElementById('spotifyTopArtists');
+    let currentArtistPosition = null;
+    
+    // Handle artist selection
+    document.querySelectorAll('.select-artist').forEach(button => {
+        button.addEventListener('click', function() {
+            currentArtistPosition = this.dataset.position;
+            artistModal.show();
+        });
+    });
+    
+    // Handle artist search
+    artistSearchButton.addEventListener('click', function() {
+        const query = artistSearchInput.value.trim();
+        if (query) {
+            fetch(`{% url 'spotify:spotify_search' %}?q=${encodeURIComponent(query)}&type=artist`)
+                .then(response => response.json())
+                .then(data => {
+                    artistSearchResults.innerHTML = '';
+                    
+                    if (data.artists && data.artists.length > 0) {
+                        data.artists.forEach(artist => {
+                            const item = document.createElement('a');
+                            item.href = '#';
+                            item.className = 'list-group-item list-group-item-action';
+                            item.innerHTML = `
+                                <div class="d-flex align-items-center">
+                                    <img src="${artist.images[0]?.url || ''}" 
+                                         width="50" 
+                                         height="50" 
+                                         class="me-3"
+                                         style="object-fit: cover;">
+                                    <div>
+                                        <h6 class="mb-0">${artist.name}</h6>
+                                        <small class="text-muted">
+                                            ${artist.followers.total} followers
+                                        </small>
+                                    </div>
+                                </div>
+                            `;
+                            item.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                updateTopArtist(artist);
+                                artistModal.hide();
+                            });
+                            artistSearchResults.appendChild(item);
+                        });
+                    } else {
+                        artistSearchResults.innerHTML = `
+                            <div class="list-group-item">
+                                <p class="text-muted mb-0">No artists found. Try a different search.</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    artistSearchResults.innerHTML = `
+                        <div class="list-group-item text-danger">
+                            <p class="mb-0">Error searching for artists. Please try again.</p>
+                        </div>
+                    `;
+                });
+        }
+    });
+    
+    // Update top artist
+    function updateTopArtist(artist) {
+        fetch('{% url "update_top_artist" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: new URLSearchParams({
+                'position': currentArtistPosition,
+                'artist_id': artist.id,
+                'artist_name': artist.name,
+                'artist_image': artist.images[0].url
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+    
+    // Toggle between user's and Spotify's top artists
+    toggleArtistView.addEventListener('click', function() {
+        if (userTopArtists.classList.contains('d-none')) {
+            userTopArtists.classList.remove('d-none');
+            spotifyTopArtists.classList.add('d-none');
+            this.textContent = "Switch to Spotify's Top 3";
+        } else {
+            userTopArtists.classList.add('d-none');
+            spotifyTopArtists.classList.remove('d-none');
+            this.textContent = "Switch to My Top 3";
+            loadSpotifyTopArtists();
+        }
+    });
+    
+    // Load Spotify's top artists
+    function loadSpotifyTopArtists() {
+        fetch('{% url "spotify:get_top_artists" %}')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.createElement('div');
+                container.className = 'row';
+                
+                data.artists.forEach((artist, index) => {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-4 mb-3';
+                    col.innerHTML = `
+                        <div class="card">
+                            <img src="${artist.images[0].url}" class="card-img-top" alt="Artist image" style="height: 200px; object-fit: cover;">
+                            <div class="card-body">
+                                <h6 class="card-title">${artist.name}</h6>
+                                <p class="card-text">${artist.followers.total} followers</p>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(col);
+                });
+                
+                spotifyTopArtists.innerHTML = '';
+                spotifyTopArtists.appendChild(container);
             });
     }
 
@@ -998,6 +1181,71 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    });
+
+    // Handle artist deletion
+    document.querySelectorAll('.delete-artist').forEach(button => {
+        button.addEventListener('click', function() {
+            const position = this.dataset.position;
+            if (confirm('Are you sure you want to remove this artist?')) {
+                fetch('{% url "update_top_artist" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: new URLSearchParams({
+                        'position': position,
+                        'artist_id': '',
+                        'artist_name': '',
+                        'artist_image': ''
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    }
+                });
+            }
+        });
+    });
+    
+    // Handle artist editing
+    document.querySelectorAll('.edit-artist').forEach(button => {
+        button.addEventListener('click', function() {
+            currentArtistPosition = this.dataset.position;
+            artistModal.show();
+        });
+    });
+
+    // Handle edit toggle for artists
+    document.querySelectorAll('.artist-card .edit-toggle').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent card click event
+            const position = this.dataset.position;
+            const card = this.closest('.artist-card');
+            const options = card.querySelector('.edit-options');
+            
+            // Hide all other edit options
+            document.querySelectorAll('.artist-card .edit-options').forEach(opt => {
+                if (opt !== options) {
+                    opt.classList.add('d-none');
+                }
+            });
+            
+            // Toggle current options
+            options.classList.toggle('d-none');
+        });
+    });
+
+    // Close edit options when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.edit-options') && !e.target.closest('.edit-toggle')) {
+            document.querySelectorAll('.edit-options').forEach(opt => {
+                opt.classList.add('d-none');
+            });
+        }
     });
 });
 </script>

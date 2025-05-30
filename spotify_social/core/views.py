@@ -102,6 +102,39 @@ def update_top_album(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 @login_required
+def update_top_artist(request):
+    if request.method == 'POST':
+        position = request.POST.get('position')
+        artist_id = request.POST.get('artist_id')
+        artist_name = request.POST.get('artist_name')
+        artist_image = request.POST.get('artist_image')
+        
+        # Allow empty values for deletion
+        if not position:
+            return JsonResponse({'error': 'Position is required'}, status=400)
+            
+        user = request.user
+        if position == '1':
+            user.top_artist1_id = artist_id
+            user.top_artist1_name = artist_name
+            user.top_artist1_image = artist_image
+        elif position == '2':
+            user.top_artist2_id = artist_id
+            user.top_artist2_name = artist_name
+            user.top_artist2_image = artist_image
+        elif position == '3':
+            user.top_artist3_id = artist_id
+            user.top_artist3_name = artist_name
+            user.top_artist3_image = artist_image
+        else:
+            return JsonResponse({'error': 'Invalid position'}, status=400)
+            
+        user.save()
+        return JsonResponse({'success': True})
+        
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@login_required
 def listen_later(request):
     """Display the user's listen later playlist"""
     if not request.user.spotify_access_token:

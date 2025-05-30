@@ -21,6 +21,19 @@ class User(AbstractUser):
     top_album3_name = models.CharField(max_length=255, blank=True, null=True)
     top_album3_image = models.URLField(max_length=500, blank=True, null=True)
     
+    # Top 3 artists picked by user
+    top_artist1_id = models.CharField(max_length=255, blank=True, null=True)
+    top_artist1_name = models.CharField(max_length=255, blank=True, null=True)
+    top_artist1_image = models.URLField(max_length=500, blank=True, null=True)
+    
+    top_artist2_id = models.CharField(max_length=255, blank=True, null=True)
+    top_artist2_name = models.CharField(max_length=255, blank=True, null=True)
+    top_artist2_image = models.URLField(max_length=500, blank=True, null=True)
+    
+    top_artist3_id = models.CharField(max_length=255, blank=True, null=True)
+    top_artist3_name = models.CharField(max_length=255, blank=True, null=True)
+    top_artist3_image = models.URLField(max_length=500, blank=True, null=True)
+    
     listen_later = models.CharField(max_length=255, blank=True, null=True)
 
     groups = models.ManyToManyField(
@@ -50,6 +63,19 @@ class User(AbstractUser):
             }
             albums.append(album)
         return albums
+
+    def get_top_artists(self):
+        """Return a list of dictionaries containing top artist data"""
+        artists = []
+        for i in range(1, 4):
+            artist = {
+                'id': getattr(self, f'top_artist{i}_id'),
+                'name': getattr(self, f'top_artist{i}_name'),
+                'image': getattr(self, f'top_artist{i}_image'),
+                'position': i
+            }
+            artists.append(artist)
+        return artists
 
     def __str__(self):
         return self.username

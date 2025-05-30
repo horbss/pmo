@@ -154,7 +154,7 @@ def spotify_search(request):
         }, status=401)
     
     query = request.GET.get('q', '')
-    results = {'tracks': [], 'albums': []}
+    results = {'tracks': [], 'albums': [], 'artists': []}
     
     if not query:
         return JsonResponse({
@@ -214,6 +214,16 @@ def spotify_search(request):
             album['spotify_url'] = album['external_urls']['spotify']
         
         results['albums'] = albums
+        
+        # Search for artists
+        artist_results = sp.search(q=query, type='artist', limit=10)
+        artists = artist_results['artists']['items']
+        
+        # Add Spotify URLs to artists
+        for artist in artists:
+            artist['spotify_url'] = artist['external_urls']['spotify']
+        
+        results['artists'] = artists
         
         return JsonResponse(results)
         
@@ -418,6 +428,32 @@ def get_top_albums(request):
         albums = list(albums_dict.values())
                 
         return JsonResponse({'albums': albums})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+def get_top_artists(request):
+    if not request.user.spotify_access_token:
+        return JsonResponse({'error': 'Spotify not connected'}, status=400)
+        
+    try:
+        sp = spotipy.Spotify(auth=request.user.spotify_access_token)
+        
+        # Get user's top artists directly
+        top_artists = sp.current_user_top_artists(limit=3, time_range='medium_term')
+        
+        # Format the artists data
+        artists = []
+        for artist in top_artists['items']:
+            artists.append({
+                'id': artist['id'],
+                'name': artist['name'],
+                'images': artist['images'],
+                'spotify_url': artist['external_urls']['spotify'],
+                'followers': artist['followers']
+            })
+                
+        return JsonResponse({'artists': artists})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 

@@ -20,7 +20,7 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from core import views as core_views
 from spotify import views as spotify_views
-from core.views import home, edit_username, update_top_album
+from core.views import home, edit_username, update_top_album, update_top_artist
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -30,6 +30,7 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='core/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
     path('update-top-album/', update_top_album, name='update_top_album'),
+    path('update-top-artist/', update_top_artist, name='update_top_artist'),
     path('spotify/', include('spotify.urls')),
     path('social/', include('social.urls')),
     path('listen-later/', core_views.listen_later, name='listen_later'),
