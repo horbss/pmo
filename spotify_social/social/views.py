@@ -49,6 +49,7 @@ def create_post(request):
     spotify_image_url = request.POST.get('spotify_image_url')
     spotify_preview_url = request.POST.get('spotify_preview_url')
     rating = request.POST.get('rating')
+    is_private = request.POST.get('is_private') == 'true'
     
     # Debug log all POST data
     logger.info(f"Create post request - Type: {post_type}, ID: {spotify_id}, Name: {spotify_name}")
@@ -114,7 +115,8 @@ def create_post(request):
                 spotify_image_url=spotify_image_url,
                 spotify_preview_url=spotify_preview_url,
                 spotify_url=spotify_link,
-                rating=rating if rating else None
+                rating=rating if rating else None,
+                is_private=is_private
             )
             logger.info(f"Created post {post.id} for {post_type} {spotify_id}")
         except Exception as post_error:
@@ -325,6 +327,94 @@ def delete_post(request, post_id):
             'message': f'Error deleting post: {str(e)}'
         })
 
+@login_required
+def edit_post(request, post_id):
+    """Edit a post"""
+    try:
+        post = get_object_or_404(Post, id=post_id)
+        
+        # Check if the user owns the post
+        if post.user != request.user:
+            return JsonResponse({
+                'success': False,
+                'message': 'You can only edit your own posts.'
+            })
+        
+        if request.method == 'GET':
+            # Return post data for editing
+            return JsonResponse({
+                'success': True,
+                'post': {
+                    'id': post.id,
+                    'content': post.content,
+                    'rating': float(post.rating) if post.rating else None,
+                    'is_private': post.is_private,
+                    'spotify_name': post.spotify_name,
+                    'spotify_artist': post.spotify_artist,
+                    'spotify_image_url': post.spotify_image_url,
+                    'post_type': post.post_type
+                }
+            })
+        
+        elif request.method == 'POST':
+            # Update post
+            content = request.POST.get('content', '').strip()
+            rating = request.POST.get('rating')
+            is_private = request.POST.get('is_private') == 'true'
+            
+            # Update fields
+            post.content = content
+            post.is_private = is_private
+            
+            # Only update rating if provided and valid
+            if rating:
+                try:
+                    rating_float = float(rating)
+                    if 1.0 <= rating_float <= 10.0:
+                        post.rating = rating_float
+                    else:
+                        return JsonResponse({
+                            'success': False,
+                            'message': 'Rating must be between 1.0 and 10.0'
+                        })
+                except ValueError:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Invalid rating value'
+                    })
+            
+            post.save()
+            
+            # Update track rating if it's a track post with rating
+            if rating and post.post_type == 'track':
+                try:
+                    from spotify.models import TrackRating
+                    TrackRating.objects.update_or_create(
+                        user=request.user,
+                        track_id=post.spotify_id,
+                        defaults={
+                            'track_name': post.spotify_name,
+                            'artist_name': post.spotify_artist,
+                            'rating': rating
+                        }
+                    )
+                    logger.info(f"Updated track rating for {post.spotify_id} to {rating}")
+                except Exception as rating_error:
+                    logger.error(f"Error updating track rating: {str(rating_error)}")
+                    # Continue even if rating update fails
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Post updated successfully!'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error editing post: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error editing post: {str(e)}'
+        })
+
 # Follow System Views
 
 @login_required
@@ -437,9 +527,12 @@ def feed(request):
     # Get users the current user is following
     following_users = request.user.get_following_users()
     
-    # Get posts from followed users
+    # Get posts from followed users, excluding private posts
     if following_users.exists():
-        feed_posts = Post.objects.filter(user__in=following_users).order_by('-created_at')
+        feed_posts = Post.objects.filter(
+            user__in=following_users,
+            is_private=False
+        ).order_by('-created_at')
     else:
         feed_posts = Post.objects.none()
     
@@ -496,8 +589,13 @@ def user_profile(request, user_id):
     if profile_user == request.user:
         return redirect('profile')
     
-    # Get user's posts
-    posts = Post.objects.filter(user=profile_user).order_by('-created_at')
+    # Get user's posts - only show public posts if viewing someone else's profile
+    if profile_user == request.user:
+        # Show all posts if it's the user's own profile
+        posts = Post.objects.filter(user=profile_user).order_by('-created_at')
+    else:
+        # Only show public posts for other users
+        posts = Post.objects.filter(user=profile_user, is_private=False).order_by('-created_at')
     
     # Check if current user is following this profile user
     is_following = request.user.is_following(profile_user)
@@ -505,6 +603,25 @@ def user_profile(request, user_id):
     spotify_data = None
     if profile_user.spotify_access_token:
         try:
+            # Create SpotifyOAuth instance for token refresh
+            sp_oauth = SpotifyOAuth(
+                client_id=settings.SPOTIFY_CLIENT_ID,
+                client_secret=settings.SPOTIFY_CLIENT_SECRET,
+                redirect_uri=settings.SPOTIFY_REDIRECT_URI,
+                scope=settings.SPOTIFY_SCOPES
+            )
+            
+            # Try to refresh the token if refresh token exists
+            if profile_user.spotify_refresh_token:
+                try:
+                    token_info = sp_oauth.refresh_access_token(profile_user.spotify_refresh_token)
+                    if token_info:
+                        profile_user.spotify_access_token = token_info['access_token']
+                        profile_user.save()
+                        logger.info(f"Refreshed access token for user {profile_user.username}")
+                except Exception as refresh_error:
+                    logger.error(f"Token refresh failed for {profile_user.username}: {str(refresh_error)}")
+            
             sp = spotipy.Spotify(auth=profile_user.spotify_access_token)
             spotify_data = sp.current_user()
         except Exception as e:

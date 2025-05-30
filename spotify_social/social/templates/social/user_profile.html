@@ -122,6 +122,19 @@
                         {% for post in posts %}
                             <div class="card mb-3">
                                 <div class="card-body">
+                                    <!-- Post Header with Privacy Indicator -->
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <small class="text-muted">
+                                            {{ post.created_at|timesince }} ago
+                                            {% if post.is_private %}
+                                                <i class="bi bi-lock-fill text-warning ms-1" title="Private post"></i>
+                                            {% endif %}
+                                        </small>
+                                        {% if post.rating %}
+                                            <span class="badge bg-warning text-dark">{{ post.rating }}/10</span>
+                                        {% endif %}
+                                    </div>
+                                    
                                     <!-- Post Content -->
                                     {% if post.content %}
                                         <p class="card-text">{{ post.content }}</p>
@@ -140,12 +153,7 @@
                                         <div class="col">
                                             <h6 class="mb-1">{{ post.spotify_name }}</h6>
                                             <p class="mb-1 text-muted">{{ post.spotify_artist }}</p>
-                                            {% if post.post_type == 'rating' and post.rating %}
-                                                <p class="mb-1">
-                                                    <span class="badge bg-warning text-dark">{{ post.rating }}/10</span>
-                                                </p>
-                                            {% endif %}
-                                            <small class="text-muted">{{ post.get_post_type_display }} • {{ post.created_at|timesince }} ago</small>
+                                            <small class="text-muted">{{ post.get_post_type_display }}</small>
                                         </div>
                                     </div>
                                     

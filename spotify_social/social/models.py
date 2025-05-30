@@ -19,6 +19,7 @@ class Post(models.Model):
     spotify_preview_url = models.URLField(blank=True, null=True)
     spotify_url = models.URLField()
     rating = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
+    is_private = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     

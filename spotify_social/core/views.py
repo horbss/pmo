@@ -9,6 +9,10 @@ from social.models import Post
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from django.http import JsonResponse
+from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 def home(request):
     return render(request, 'core/home.html')
@@ -25,6 +29,26 @@ def profile(request):
     
     if request.user.spotify_access_token:
         try:
+            # Create SpotifyOAuth instance for token refresh
+            sp_oauth = SpotifyOAuth(
+                client_id=settings.SPOTIFY_CLIENT_ID,
+                client_secret=settings.SPOTIFY_CLIENT_SECRET,
+                redirect_uri=settings.SPOTIFY_REDIRECT_URI,
+                scope=settings.SPOTIFY_SCOPES
+            )
+            
+            # Try to refresh the token
+            if request.user.spotify_refresh_token:
+                try:
+                    token_info = sp_oauth.refresh_access_token(request.user.spotify_refresh_token)
+                    if token_info:
+                        request.user.spotify_access_token = token_info['access_token']
+                        request.user.save()
+                        logger.info(f"Refreshed access token for user {request.user.username}")
+                except Exception as refresh_error:
+                    logger.error(f"Token refresh failed: {str(refresh_error)}")
+                    messages.error(request, 'Your Spotify session has expired. Please reconnect your account.')
+                    
             sp = spotipy.Spotify(auth=request.user.spotify_access_token)
             spotify_data = sp.current_user()
             
@@ -40,6 +64,7 @@ def profile(request):
             top_tracks = sp.current_user_top_tracks(limit=3, time_range=time_range)
             
         except Exception as e:
+            logger.error(f"Error fetching Spotify data: {str(e)}")
             messages.error(request, 'Error fetching Spotify data. Please reconnect your Spotify account.')
     
     # Get user's posts

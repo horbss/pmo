@@ -305,6 +305,17 @@
                                     </div>
                                 </div>
                                 
+                                <!-- Privacy Control -->
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_private" id="is_private">
+                                        <label class="form-check-label" for="is_private">
+                                            <i class="bi bi-lock"></i> Make this post private
+                                        </label>
+                                        <small class="form-text text-muted d-block">Private posts are only visible to you.</small>
+                                    </div>
+                                </div>
+                                
                                 <button type="submit" class="btn btn-primary" id="submit-post" disabled>Create Post</button>
                             </form>
                         </div>
@@ -320,17 +331,37 @@
                                              class="rounded-circle me-3"
                                              style="width: 40px; height: 40px;">
                                     {% endif %}
-                                    <div>
+                                    <div class="flex-grow-1">
                                         <h5 class="mb-0">{{ post.user.username }}</h5>
-                                        <small class="text-muted">{{ post.created_at|timesince }} ago</small>
+                                        <small class="text-muted">
+                                            {{ post.created_at|timesince }} ago
+                                            {% if post.is_private %}
+                                                <i class="bi bi-lock-fill text-warning ms-1" title="Private post"></i>
+                                            {% endif %}
+                                        </small>
                                     </div>
                                     {% if post.user == request.user and request.user == user %}
-                                        <button class="btn btn-sm btn-outline-danger ms-auto delete-post" 
-                                                data-post-id="{{ post.id }}"
-                                                data-bs-toggle="tooltip"
-                                                title="Delete post">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li>
+                                                    <a class="dropdown-item edit-post" href="#" 
+                                                       data-post-id="{{ post.id }}"
+                                                       data-bs-toggle="modal" 
+                                                       data-bs-target="#editPostModal">
+                                                        <i class="bi bi-pencil"></i> Edit Post
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item text-danger delete-post" href="#" 
+                                                       data-post-id="{{ post.id }}">
+                                                        <i class="bi bi-trash"></i> Delete Post
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     {% endif %}
                                 </div>
                                 
@@ -423,6 +454,75 @@
                 <div id="artistSearchResults" class="list-group">
                     <!-- Search results will be displayed here -->
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Post Modal -->
+<div class="modal fade" id="editPostModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editPostForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="edit_post_id" name="post_id">
+                    
+                    <!-- Spotify Item Display -->
+                    <div class="mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <img id="edit_spotify_image" src="" alt="" class="me-3" style="width: 64px; height: 64px;">
+                                    <div>
+                                        <h5 id="edit_spotify_name" class="mb-1"></h5>
+                                        <p id="edit_spotify_artist" class="mb-0 text-muted"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Content -->
+                    <div class="mb-3">
+                        <label for="edit_content" class="form-label">Share your thoughts</label>
+                        <textarea class="form-control" id="edit_content" name="content" rows="3"></textarea>
+                    </div>
+                    
+                    <!-- Rating (conditionally shown) -->
+                    <div class="mb-3" id="edit_rating_section" style="display: none;">
+                        <label class="form-label">Rating</label>
+                        <div class="input-group" style="max-width: 200px;">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="edit_rating"
+                                   name="rating" 
+                                   min="1" 
+                                   max="10" 
+                                   step="0.1"
+                                   placeholder="1.0-10.0">
+                            <span class="input-group-text">/10</span>
+                        </div>
+                        <small class="text-muted">Enter a rating from 1.0 to 10.0</small>
+                    </div>
+                    
+                    <!-- Privacy Control -->
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_private" id="edit_is_private">
+                            <label class="form-check-label" for="edit_is_private">
+                                <i class="bi bi-lock"></i> Make this post private
+                            </label>
+                            <small class="form-text text-muted d-block">Private posts are only visible to you.</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Update Post</button>
+                </form>
             </div>
         </div>
     </div>
@@ -1190,6 +1290,91 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Error deleting post. Please try again.');
                 });
             }
+        });
+    });
+
+    // Handle post editing
+    const editPostModal = new bootstrap.Modal(document.getElementById('editPostModal'));
+    
+    document.querySelectorAll('.edit-post').forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            
+            // Fetch post data
+            fetch(`/social/edit-post/${postId}/`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const post = data.post;
+                    
+                    // Populate modal fields
+                    document.getElementById('edit_post_id').value = post.id;
+                    document.getElementById('edit_content').value = post.content || '';
+                    document.getElementById('edit_spotify_name').textContent = post.spotify_name;
+                    document.getElementById('edit_spotify_artist').textContent = post.spotify_artist;
+                    document.getElementById('edit_spotify_image').src = post.spotify_image_url;
+                    document.getElementById('edit_is_private').checked = post.is_private;
+                    
+                    // Show/hide rating section based on post type and existing rating
+                    const ratingSection = document.getElementById('edit_rating_section');
+                    const ratingInput = document.getElementById('edit_rating');
+                    
+                    if (post.post_type === 'track' || post.post_type === 'album' || post.rating) {
+                        ratingSection.style.display = 'block';
+                        ratingInput.value = post.rating || '';
+                    } else {
+                        ratingSection.style.display = 'none';
+                        ratingInput.value = '';
+                    }
+                    
+                    // Show modal
+                    editPostModal.show();
+                } else {
+                    alert('Error loading post data: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error loading post data. Please try again.');
+            });
+        });
+    });
+
+    // Handle edit post form submission
+    document.getElementById('editPostForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const postId = document.getElementById('edit_post_id').value;
+        const formData = new FormData(this);
+        
+        fetch(`/social/edit-post/${postId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Post updated successfully!');
+                editPostModal.hide();
+                // Refresh the page to show updated post
+                location.reload();
+            } else {
+                alert('Error updating post: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating post. Please try again.');
         });
     });
 
